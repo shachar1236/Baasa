@@ -1,0 +1,79 @@
+package api
+
+import (
+	"log/slog"
+	"net/http"
+
+	"github.com/shachar1236/Baasa/access_rules"
+	"github.com/shachar1236/Baasa/database"
+)
+
+func addRoutes(mux *http.ServeMux, logger *slog.Logger) {
+	mux.Handle("/query", handleQuery(logger))
+	mux.Handle("/", http.NotFoundHandler())
+}
+
+func handleQuery(logger *slog.Logger) http.Handler {
+
+    type QueryMessage struct {
+        QueryId int64 `json:"QueryId"`
+        Session string `json:"Session"`
+        QueryArgs map[string]any `json:"QuaryArgs"`
+    }
+
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+            msg, err := decode[QueryMessage](r)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			query_filters := ""
+
+			// getting query
+			query, err := database.GetQuaryById(r.Context(), msg.QueryId)
+			if err != nil {
+				logger.Error("Cannot get query: ", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			// getting user
+			user, err := database.GetUserBySession(r.Context(), msg.Session)
+			if err != nil {
+				logger.Error("Cannot get user")
+				user.ID = -1
+				user.Username = ""
+			}
+
+			// check if query is by the rules
+			request := access_rules.Request{
+				Method:  r.Method,
+				Headers: r.Header,
+				Auth:    user,
+			}
+
+			accept, err := access_rules.CheckRules(query.QueryRulesFilePath, &query_filters, request)
+			if err != nil {
+				logger.Error("Cannot check query rules: ", err)
+				http.Error(w, "An error occured", http.StatusInternalServerError)
+				return
+			}
+
+			if accept {
+				// run query
+				resJson, err := database.RunQueryWithFilters(r.Context(), query, msg.QueryArgs, query_filters)
+				if err != nil {
+					logger.Error("Cannot run query: ", err)
+					http.Error(w, "An error occured", http.StatusInternalServerError)
+					return
+				}
+
+				w.WriteHeader(http.StatusOK)
+				w.Header().Set("Content-Type", "application/json")
+				w.Write(resJson)
+			}
+		},
+	)
+}

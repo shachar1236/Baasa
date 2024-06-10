@@ -72,3 +72,4 @@ tags
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/vim,visualstudiocode,go,svelte
+server/logs

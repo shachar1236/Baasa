@@ -2,80 +2,32 @@ package api
 
 import (
 	"context"
-	"encoding/json"
-	"log"
+	"io"
+	"os"
+	"log/slog"
 	"net/http"
-
-	"github.com/shachar1236/Baasa/access_rules"
-	"github.com/shachar1236/Baasa/database"
 )
 
 const portNum string = ":5050"
 
-func query(w http.ResponseWriter, r *http.Request) {
-    var msg QueryMessage 
 
-    err := json.NewDecoder(r.Body).Decode(&msg)
+func RunApi(ctx context.Context, err_channel chan error) {
+	mux := http.NewServeMux()
+
+    logFile, err := os.OpenFile("logs/api.log", os.O_CREATE | os.O_APPEND | os.O_RDWR, 0666)
     if err != nil {
-        w.WriteHeader(http.StatusBadRequest)
-        return
+        err_channel <- err
     }
+    mw := io.MultiWriter(os.Stdout, logFile)
+    logger := slog.New(slog.NewTextHandler(mw, &slog.HandlerOptions{AddSource: true}))
 
-    log.Println(msg.QueryId, msg.Session)
+    addRoutes(mux, logger)
 
-    query_filters := ""
+	logger.Info("Started on port " + portNum)
+	logger.Info("To close connection CTRL+C :-)")
 
-    // getting query
-    query, err := database.GetQuaryById(r.Context(), msg.QueryId)
-    if err != nil {
-        log.Println("Cannot get query: ", err)
-        http.Error(w, err.Error(), http.StatusInternalServerError)
-        return
+    err = http.ListenAndServe(portNum, mux)
+	if err != nil {
+        err_channel <- err
     }
-
-    // getting user
-    user, err := database.GetUserBySession(r.Context(), msg.Session)
-    if err != nil {
-        log.Println("Cannot get user")
-        user.ID = -1
-        user.Username = ""
-    }
-
-    // check if query is by the rules
-    request := access_rules.Request{
-        Method: r.Method,
-        Headers: r.Header,
-        Auth: user,
-    }
-
-
-    accept, err := access_rules.CheckRules(query.QueryRulesFilePath, &query_filters, request)
-    if err != nil {
-        log.Println("Cannot check query rules: ", err)
-        http.Error(w, "An error occured", http.StatusInternalServerError)
-        return
-    }
-
-    if accept {
-        // run query
-        resJson, err := database.RunQueryWithFilters(r.Context(), query, msg.QueryArgs, query_filters)
-        if err != nil {
-            log.Println("Cannot run query: ", err)
-            http.Error(w, "An error occured", http.StatusInternalServerError)
-            return
-        }
-
-        w.WriteHeader(http.StatusOK)
-        w.Header().Set("Content-Type", "application/json")
-        w.Write([]byte(resJson))
-    }
-
-}
-
-func RunApi(ctx context.Context) {
-    mux := http.NewServeMux()
-    mux.HandleFunc("/query", query)
-    log.Println("Started on port", portNum)
-    log.Println("To close connection CTRL+C :-)")
-    log.Fatal(http.ListenAndServe(portNum, mux))
 }

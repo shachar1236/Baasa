@@ -10,6 +10,7 @@ export default defineConfig({
                 register: "register.html", // Entry point for the home page
                 login: "login.html", // Entry point for the about page
                 collection: "collection.html",
+                home: "home.html",
             },
         },
     },
