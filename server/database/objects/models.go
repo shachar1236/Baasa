@@ -22,7 +22,7 @@ type Query struct {
 
 type TableField struct {
 	ID           int64
-	TableID      int64
+	CollectionID int64
 	FieldName    string
 	FieldType    string
 	FieldOptions sql.NullString

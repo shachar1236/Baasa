@@ -42,7 +42,7 @@ func (q *Queries) CountUsersWithNameAndPassword(ctx context.Context, arg CountUs
 }
 
 const createField = `-- name: CreateField :exec
-INSERT INTO table_fields (field_name, field_type, field_options, table_id)
+INSERT INTO table_fields (field_name, field_type, field_options, collection_id)
 VALUES (?, ?, ?, ?)
 `
 
@@ -50,7 +50,7 @@ type CreateFieldParams struct {
 	FieldName    string
 	FieldType    string
 	FieldOptions sql.NullString
-	TableID      int64
+	CollectionID int64
 }
 
 func (q *Queries) CreateField(ctx context.Context, arg CreateFieldParams) error {
@@ -58,7 +58,7 @@ func (q *Queries) CreateField(ctx context.Context, arg CreateFieldParams) error 
 		arg.FieldName,
 		arg.FieldType,
 		arg.FieldOptions,
-		arg.TableID,
+		arg.CollectionID,
 	)
 	return err
 }
@@ -110,23 +110,25 @@ func (q *Queries) DeleteQueryById(ctx context.Context, id int64) error {
 }
 
 const getAllTablesAndFields = `-- name: GetAllTablesAndFields :many
-SELECT collections.id AS table_id, 
+SELECT collections.id AS collection_id, 
        collections.table_name, 
+       collections.query_rules_directory_path as QueryRulesDirectoryPath,
        table_fields.id AS field_id, 
        table_fields.field_name, 
        table_fields.field_type, 
        table_fields.field_options
 FROM collections 
-INNER JOIN table_fields ON table_fields.table_id = collections.id
+INNER JOIN table_fields ON table_fields.collection_id = collections.id
 `
 
 type GetAllTablesAndFieldsRow struct {
-	TableID      int64
-	TableName    string
-	FieldID      int64
-	FieldName    string
-	FieldType    string
-	FieldOptions sql.NullString
+	CollectionID            int64
+	TableName               string
+	Queryrulesdirectorypath string
+	FieldID                 int64
+	FieldName               string
+	FieldType               string
+	FieldOptions            sql.NullString
 }
 
 func (q *Queries) GetAllTablesAndFields(ctx context.Context) ([]GetAllTablesAndFieldsRow, error) {
@@ -139,8 +141,9 @@ func (q *Queries) GetAllTablesAndFields(ctx context.Context) ([]GetAllTablesAndF
 	for rows.Next() {
 		var i GetAllTablesAndFieldsRow
 		if err := rows.Scan(
-			&i.TableID,
+			&i.CollectionID,
 			&i.TableName,
+			&i.Queryrulesdirectorypath,
 			&i.FieldID,
 			&i.FieldName,
 			&i.FieldType,
@@ -184,9 +187,9 @@ func (q *Queries) GetQueryByQuery(ctx context.Context, query string) (Query, err
 }
 
 const getTableAndFielsByTableName = `-- name: GetTableAndFielsByTableName :one
-SELECT collections.id, table_name, query_rules_directory_path, table_fields.id, table_id, field_name, field_type, field_options FROM collections
+SELECT collections.id, table_name, query_rules_directory_path, table_fields.id, collection_id, field_name, field_type, field_options FROM collections
 INNER JOIN table_fields
-ON table_fields.table_id = collections.id
+ON table_fields.collection_id = collections.id
 WHERE collections.table_name = ?
 `
 
@@ -195,7 +198,7 @@ type GetTableAndFielsByTableNameRow struct {
 	TableName               string
 	QueryRulesDirectoryPath string
 	ID_2                    int64
-	TableID                 int64
+	CollectionID            int64
 	FieldName               string
 	FieldType               string
 	FieldOptions            sql.NullString
@@ -209,7 +212,7 @@ func (q *Queries) GetTableAndFielsByTableName(ctx context.Context, tableName str
 		&i.TableName,
 		&i.QueryRulesDirectoryPath,
 		&i.ID_2,
-		&i.TableID,
+		&i.CollectionID,
 		&i.FieldName,
 		&i.FieldType,
 		&i.FieldOptions,

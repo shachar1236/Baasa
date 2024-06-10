@@ -4,6 +4,8 @@
 
 <div class="collections-edit-screen">
     <div class="edit-table">
+        <h2>Fields</h2>
+        <hr />
         <table>
             <tr>
                 <td class="fields">field name</td>
@@ -24,16 +26,27 @@
 <style>
     .collections-edit-screen {
         width: 94vw;
-        height: 100vh;
+        /* height: 100vh; */
         margin-top: 2rem;
         background-color: #f0f0f0;
         border-radius: 20px;
-        padding: 20px;
+        padding: 4rem 1.5rem;
         transition: all 0.2s ease-in-out;
+    }
+
+    h2 {
+        color: #111;
+    }
+
+    hr {
+        width: 100%;
+        margin: 0.5rem 0;
+        border-color: #111;
     }
 
     .edit-table {
         display: flex;
+        flex-direction: column;
         justify-content: center;
         align-items: center;
         margin-top: 3rem;
@@ -45,6 +58,7 @@
         background-color: #e9e9e9;
         width: 100%;
         border-collapse: collapse;
+        margin: 3rem 0;
     }
 
     .fields {

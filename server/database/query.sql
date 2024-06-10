@@ -48,23 +48,24 @@ WHERE id = ?;
 -- name: GetTableAndFielsByTableName :one 
 SELECT * FROM collections
 INNER JOIN table_fields
-ON table_fields.table_id = collections.id
+ON table_fields.collection_id = collections.id
 WHERE collections.table_name = ?;
 
 -- name: GetAllTablesAndFields :many
-SELECT collections.id AS table_id, 
+SELECT collections.id AS collection_id, 
        collections.table_name, 
+       collections.query_rules_directory_path as QueryRulesDirectoryPath,
        table_fields.id AS field_id, 
        table_fields.field_name, 
        table_fields.field_type, 
        table_fields.field_options
 FROM collections 
-INNER JOIN table_fields ON table_fields.table_id = collections.id;
+INNER JOIN table_fields ON table_fields.collection_id = collections.id;
 
 -- name: CreateTable :exec
 INSERT INTO collections (table_name)
 VALUES (?) RETURNING *;
 
 -- name: CreateField :exec
-INSERT INTO table_fields (field_name, field_type, field_options, table_id)
+INSERT INTO table_fields (field_name, field_type, field_options, collection_id)
 VALUES (?, ?, ?, ?);

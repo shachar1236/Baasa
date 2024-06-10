@@ -10,8 +10,3 @@ type TableField struct {
     Type string
     Options string
 };
-
-type Table struct {
-    Name string
-    Fields []TableField
-};

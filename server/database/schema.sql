@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
     session text NOT NULL UNIQUE
 );
 
--- tables table
+-- collections table
 CREATE TABLE IF NOT EXISTS collections (
     id   INTEGER PRIMARY KEY,
     table_name text NOT NULL UNIQUE,
@@ -16,13 +16,13 @@ CREATE TABLE IF NOT EXISTS collections (
 -- table_fields table 
 CREATE TABLE IF NOT EXISTS table_fields (
     id INTEGER PRIMARY KEY,
-    table_id INTEGER NOT NULL,
+    collection_id INTEGER NOT NULL,
 
     field_name text NOT NULL,
     field_type text NOT NULL,
     field_options text,
 
-    FOREIGN KEY(table_id) REFERENCES my_tables(id)
+    FOREIGN KEY(collection_id) REFERENCES collections(id)
 );
 
 -- querys table

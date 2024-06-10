@@ -104,6 +104,14 @@ func Login(w http.ResponseWriter, r *http.Request) {
     }
 }
 
+func GetTables(w http.ResponseWriter, r *http.Request) {
+    if admin_exists && IsAuthenticated(r) {
+        GetTables
+    } else {
+        w.WriteHeader(http.StatusBadRequest)
+    }
+}
+
 func RunDashboard(ctx context.Context) {
     // checking if admin exists
     var err error

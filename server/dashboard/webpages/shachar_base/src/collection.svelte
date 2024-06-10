@@ -6,9 +6,9 @@
     let collection = {
         id: 1,
         table: [
-            ["post", "string", ""],
-            ["username", "key", ""],
-            ["content", "string", ""],
+            ["post", "text", ""],
+            ["user_id", "FK(users.id)", ""],
+            ["content", "text", ""],
             ["date", "date", ""],
         ],
     };
