@@ -73,14 +73,16 @@ func (q *Queries) CreateQuery(ctx context.Context, query string) error {
 	return err
 }
 
-const createTable = `-- name: CreateTable :exec
+const createTable = `-- name: CreateTable :one
 INSERT INTO collections (table_name)
 VALUES (?) RETURNING id, table_name, query_rules_directory_path
 `
 
-func (q *Queries) CreateTable(ctx context.Context, tableName string) error {
-	_, err := q.db.ExecContext(ctx, createTable, tableName)
-	return err
+func (q *Queries) CreateTable(ctx context.Context, tableName string) (Collection, error) {
+	row := q.db.QueryRowContext(ctx, createTable, tableName)
+	var i Collection
+	err := row.Scan(&i.ID, &i.TableName, &i.QueryRulesDirectoryPath)
+	return i, err
 }
 
 const createUser = `-- name: CreateUser :exec
@@ -96,6 +98,15 @@ type CreateUserParams struct {
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
 	_, err := q.db.ExecContext(ctx, createUser, arg.Username, arg.PasswordHash, arg.Session)
+	return err
+}
+
+const deleteCollection = `-- name: DeleteCollection :exec
+DELETE FROM collections WHERE table_name = ?
+`
+
+func (q *Queries) DeleteCollection(ctx context.Context, tableName string) error {
+	_, err := q.db.ExecContext(ctx, deleteCollection, tableName)
 	return err
 }
 
@@ -118,16 +129,16 @@ SELECT collections.id AS collection_id,
        table_fields.field_type, 
        table_fields.field_options
 FROM collections 
-INNER JOIN table_fields ON table_fields.collection_id = collections.id
+LEFT JOIN table_fields ON collections.id = table_fields.collection_id
 `
 
 type GetAllTablesAndFieldsRow struct {
 	CollectionID            int64
 	TableName               string
 	Queryrulesdirectorypath string
-	FieldID                 int64
-	FieldName               string
-	FieldType               string
+	FieldID                 sql.NullInt64
+	FieldName               sql.NullString
+	FieldType               sql.NullString
 	FieldOptions            sql.NullString
 }
 
@@ -186,21 +197,82 @@ func (q *Queries) GetQueryByQuery(ctx context.Context, query string) (Query, err
 	return i, err
 }
 
+const getTableAndFieldsByTableId = `-- name: GetTableAndFieldsByTableId :many
+SELECT collections.id AS collection_id,
+    collections.table_name,
+    collections.query_rules_directory_path as QueryRulesDirectoryPath,
+    table_fields.id AS field_id,
+    table_fields.field_name,
+    table_fields.field_type,
+    table_fields.field_options
+FROM collections
+LEFT JOIN table_fields
+ON table_fields.collection_id = collection_id
+WHERE collections.id = ?
+`
+
+type GetTableAndFieldsByTableIdRow struct {
+	CollectionID            int64
+	TableName               string
+	Queryrulesdirectorypath string
+	FieldID                 sql.NullInt64
+	FieldName               sql.NullString
+	FieldType               sql.NullString
+	FieldOptions            sql.NullString
+}
+
+func (q *Queries) GetTableAndFieldsByTableId(ctx context.Context, id int64) ([]GetTableAndFieldsByTableIdRow, error) {
+	rows, err := q.db.QueryContext(ctx, getTableAndFieldsByTableId, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetTableAndFieldsByTableIdRow
+	for rows.Next() {
+		var i GetTableAndFieldsByTableIdRow
+		if err := rows.Scan(
+			&i.CollectionID,
+			&i.TableName,
+			&i.Queryrulesdirectorypath,
+			&i.FieldID,
+			&i.FieldName,
+			&i.FieldType,
+			&i.FieldOptions,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTableAndFieldsByTableName = `-- name: GetTableAndFieldsByTableName :many
-SELECT collections.id, table_name, query_rules_directory_path, table_fields.id, collection_id, field_name, field_type, field_options FROM collections
-INNER JOIN table_fields
-ON table_fields.collection_id = collections.id
+SELECT collections.id AS collection_id,
+    collections.table_name,
+    collections.query_rules_directory_path as QueryRulesDirectoryPath,
+    table_fields.id AS field_id,
+    table_fields.field_name,
+    table_fields.field_type,
+    table_fields.field_options
+FROM collections
+LEFT JOIN table_fields
+ON table_fields.collection_id = collection_id
 WHERE collections.table_name = ?
 `
 
 type GetTableAndFieldsByTableNameRow struct {
-	ID                      int64
-	TableName               string
-	QueryRulesDirectoryPath string
-	ID_2                    int64
 	CollectionID            int64
-	FieldName               string
-	FieldType               string
+	TableName               string
+	Queryrulesdirectorypath string
+	FieldID                 sql.NullInt64
+	FieldName               sql.NullString
+	FieldType               sql.NullString
 	FieldOptions            sql.NullString
 }
 
@@ -214,11 +286,10 @@ func (q *Queries) GetTableAndFieldsByTableName(ctx context.Context, tableName st
 	for rows.Next() {
 		var i GetTableAndFieldsByTableNameRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.TableName,
-			&i.QueryRulesDirectoryPath,
-			&i.ID_2,
 			&i.CollectionID,
+			&i.TableName,
+			&i.Queryrulesdirectorypath,
+			&i.FieldID,
 			&i.FieldName,
 			&i.FieldType,
 			&i.FieldOptions,

@@ -12,11 +12,17 @@
                 <td class="fields">field type</td>
                 <td class="fields">options</td>
             </tr>
-            {#each collection.table as row, rowIndex}
+            {#each collection.Fields as _, i}
                 <tr>
-                    {#each row as cell, colIndex}
-                        <td contenteditable={true}>{cell}</td>
-                    {/each}
+                    <td contenteditable={true}
+                        >{collection.Fields[i].FieldName}</td
+                    >
+                    <td contenteditable={true}
+                        >{collection.Fields[i].FieldType}</td
+                    >
+                    <td contenteditable={true}
+                        >{collection.Fields[i].FieldOptions.String}</td
+                    >
                 </tr>
             {/each}
         </table>

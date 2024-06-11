@@ -46,10 +46,30 @@ SET query = ?
 WHERE id = ?;
 
 -- name: GetTableAndFieldsByTableName :many 
-SELECT * FROM collections
-INNER JOIN table_fields
-ON table_fields.collection_id = collections.id
+SELECT collections.id AS collection_id,
+    collections.table_name,
+    collections.query_rules_directory_path as QueryRulesDirectoryPath,
+    table_fields.id AS field_id,
+    table_fields.field_name,
+    table_fields.field_type,
+    table_fields.field_options
+FROM collections
+LEFT JOIN table_fields
+ON table_fields.collection_id = collection_id
 WHERE collections.table_name = ?;
+
+-- name: GetTableAndFieldsByTableId :many 
+SELECT collections.id AS collection_id,
+    collections.table_name,
+    collections.query_rules_directory_path as QueryRulesDirectoryPath,
+    table_fields.id AS field_id,
+    table_fields.field_name,
+    table_fields.field_type,
+    table_fields.field_options
+FROM collections
+LEFT JOIN table_fields
+ON table_fields.collection_id = collection_id
+WHERE collections.id = ?;
 
 -- name: GetAllTablesAndFields :many
 SELECT collections.id AS collection_id, 
@@ -60,12 +80,15 @@ SELECT collections.id AS collection_id,
        table_fields.field_type, 
        table_fields.field_options
 FROM collections 
-INNER JOIN table_fields ON table_fields.collection_id = collections.id;
+LEFT JOIN table_fields ON collections.id = table_fields.collection_id;
 
--- name: CreateTable :exec
+-- name: CreateTable :one
 INSERT INTO collections (table_name)
 VALUES (?) RETURNING *;
 
 -- name: CreateField :exec
 INSERT INTO table_fields (field_name, field_type, field_options, collection_id)
 VALUES (?, ?, ?, ?);
+
+-- name: DeleteCollection :exec
+DELETE FROM collections WHERE table_name = ?;

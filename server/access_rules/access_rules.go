@@ -3,7 +3,6 @@ package access_rules
 import (
 	"errors"
 	"io"
-	"log"
 	"log/slog"
 	"os"
 
@@ -33,12 +32,12 @@ func New(db database.Database) AccessRules {
 	return AccessRules{
 		logger: logger,
 		db:     db,
-        databaseQuery: getDatabaseQueryFunction(db),
-        databaseCount: getDatabaseCountFunction(db),
+        databaseQuery: getDatabaseQueryFunction(db, logger),
+        databaseCount: getDatabaseCountFunction(db, logger),
 	}
 }
 
-func getDatabaseQueryFunction(db database.Database) lua.LGFunction {
+func getDatabaseQueryFunction(db database.Database, logger *slog.Logger) lua.LGFunction {
 	return func(L *lua.LState) int {
 		query := L.ToString(1)
 		args := L.ToTable(2)
@@ -50,7 +49,7 @@ func getDatabaseQueryFunction(db database.Database) lua.LGFunction {
 		})
 		res, err := db.RunQuery(query, my_args)
 		if err != nil {
-			log.Println("Cant run query from lua error: ", err)
+			logger.Info("Cant run query from lua error: ", err)
 		}
 
 		L.Push(luar.New(L, res))
@@ -58,7 +57,7 @@ func getDatabaseQueryFunction(db database.Database) lua.LGFunction {
 	}
 }
 
-func  getDatabaseCountFunction(db database.Database) lua.LGFunction {
+func  getDatabaseCountFunction(db database.Database, logger *slog.Logger) lua.LGFunction {
 	return func(L *lua.LState) int {
 		collection_name := L.ToString(1)
 		filters := L.ToString(2)
@@ -71,7 +70,7 @@ func  getDatabaseCountFunction(db database.Database) lua.LGFunction {
 
 		count, err := db.BasicCount(collection_name, filters, my_args)
 		if err != nil {
-			log.Println("Cant run count query from lua: ", err)
+			logger.Info("Cant run count query from lua: ", err)
 		}
 
 		L.Push(lua.LNumber(count))

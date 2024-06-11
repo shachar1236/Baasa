@@ -8,7 +8,10 @@ import (
 
 type Database interface {
     GetCollectionByName(ctx context.Context, name string) (types.Collection, error)
+    GetCollectionById(ctx context.Context, id int64) (types.Collection, error)
     GetCollections(ctx context.Context) ([]types.Collection, error)
+    AddCollection(ctx context.Context) (types.Collection, error)
+    DeleteCollection(ctx context.Context, name string) error
 
     GetQueryById(ctx context.Context, id int64) (string, error)
     GetQuaryById(ctx context.Context, query_id int64) (types.Query, error)

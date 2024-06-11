@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS table_fields (
     field_type text NOT NULL,
     field_options text,
 
-    FOREIGN KEY(collection_id) REFERENCES collections(id)
+    FOREIGN KEY(collection_id) REFERENCES collections(id) ON DELETE CASCADE
 );
 
 -- querys table

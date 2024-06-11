@@ -28,10 +28,6 @@ func (this *SqliteDB) GetUserById(ctx context.Context, id int64) (types.User, er
         return types.User{}, err
     }
     pass_hash := user.PasswordHash.([]byte)
-    if err != nil {
-        this.logger.Error("Cannot get user: ", err)
-        return types.User{}, err
-    }
 
     ret := types.User{
         ID: user.ID,
@@ -49,10 +45,6 @@ func (this *SqliteDB) GetUserBySession(ctx context.Context, session string) (typ
         return types.User{}, err
     }
     pass_hash := user.PasswordHash.([]byte)
-    if err != nil {
-        this.logger.Error("Cannot get user: ", err)
-        return types.User{}, err
-    }
 
     ret := types.User{
         ID: user.ID,
@@ -87,10 +79,6 @@ func (this *SqliteDB) GetUser(ctx context.Context, username string, password str
         return types.User{}, err
     }
     pass_hash := user.PasswordHash.([]byte)
-    if err != nil {
-        this.logger.Error("Cannot get user: ", err)
-        return types.User{}, err
-    }
 
     ret := types.User{
         ID: user.ID,

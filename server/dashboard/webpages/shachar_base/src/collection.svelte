@@ -4,14 +4,32 @@
     import { writable } from "svelte/store";
 
     let collection = {
-        id: 1,
-        table: [
-            ["post", "text", ""],
-            ["user_id", "FK(users.id)", ""],
-            ["content", "text", ""],
-            ["date", "date", ""],
+        ID: 1,
+        Name: "User",
+        QueryRulesDirectoryPath: "access_rules/rules",
+        Fields: [
+            {
+                ID: 1,
+                CollectionID: 0,
+                FieldName: "Username",
+                FieldType: "text",
+                FieldOptions: { String: "NOT NULL", Valid: true },
+            },
+            {
+                ID: 2,
+                CollectionID: 0,
+                FieldName: "Password",
+                FieldType: "BLOB",
+                FieldOptions: { String: "NOT NULL", Valid: true },
+            },
         ],
     };
+
+    fetch(`/GetCollection?id=${collection.ID}`).then((response) => {
+        response.json().then((data) => {
+            collection = data;
+        });
+    });
 
     let currentScreen = CollectionsEditScreen;
 </script>
