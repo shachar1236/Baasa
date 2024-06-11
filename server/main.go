@@ -8,15 +8,15 @@ import (
 
 	"github.com/shachar1236/Baasa/api"
 	"github.com/shachar1236/Baasa/dashboard"
-	"github.com/shachar1236/Baasa/database"
 )
 
 func run(ctx context.Context, w io.Writer, args []string) error {
-    database.Init(ctx)
+    db := GetDatabase(ctx, args)
+    access_rules := GetAccessRules(ctx, args, db)
 
     err_channel := make(chan error)
-    go dashboard.RunDashboard(ctx, err_channel)
-    api.RunApi(ctx, err_channel)
+    go dashboard.RunDashboard(ctx, err_channel, db)
+    api.RunApi(ctx, err_channel, db, access_rules)
 
     return <-err_channel
 }

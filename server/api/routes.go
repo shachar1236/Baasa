@@ -8,12 +8,12 @@ import (
 	"github.com/shachar1236/Baasa/database"
 )
 
-func addRoutes(mux *http.ServeMux, logger *slog.Logger) {
-	mux.Handle("/query", handleQuery(logger))
+func addRoutes(mux *http.ServeMux, logger *slog.Logger, db database.Database, access_rules access_rules.AccessRules) {
+	mux.Handle("/query", handleQuery(logger, db, access_rules))
 	mux.Handle("/", http.NotFoundHandler())
 }
 
-func handleQuery(logger *slog.Logger) http.Handler {
+func handleQuery(logger *slog.Logger, db database.Database, ar access_rules.AccessRules) http.Handler {
 
     type QueryMessage struct {
         QueryId int64 `json:"QueryId"`
@@ -32,7 +32,7 @@ func handleQuery(logger *slog.Logger) http.Handler {
 			query_filters := ""
 
 			// getting query
-			query, err := database.GetQuaryById(r.Context(), msg.QueryId)
+			query, err := db.GetQuaryById(r.Context(), msg.QueryId)
 			if err != nil {
 				logger.Error("Cannot get query: ", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -40,7 +40,7 @@ func handleQuery(logger *slog.Logger) http.Handler {
 			}
 
 			// getting user
-			user, err := database.GetUserBySession(r.Context(), msg.Session)
+			user, err := db.GetUserBySession(r.Context(), msg.Session)
 			if err != nil {
 				logger.Error("Cannot get user")
 				user.ID = -1
@@ -54,7 +54,7 @@ func handleQuery(logger *slog.Logger) http.Handler {
 				Auth:    user,
 			}
 
-			accept, err := access_rules.CheckRules(query.QueryRulesFilePath, &query_filters, request)
+			accept, err := ar.CheckRules(query.QueryRulesFilePath, &query_filters, request)
 			if err != nil {
 				logger.Error("Cannot check query rules: ", err)
 				http.Error(w, "An error occured", http.StatusInternalServerError)
@@ -63,7 +63,7 @@ func handleQuery(logger *slog.Logger) http.Handler {
 
 			if accept {
 				// run query
-				resJson, err := database.RunQueryWithFilters(r.Context(), query, msg.QueryArgs, query_filters)
+				resJson, err := db.RunQueryWithFilters(r.Context(), query, msg.QueryArgs, query_filters)
 				if err != nil {
 					logger.Error("Cannot run query: ", err)
 					http.Error(w, "An error occured", http.StatusInternalServerError)

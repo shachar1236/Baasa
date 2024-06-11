@@ -45,7 +45,7 @@ UPDATE queries
 SET query = ?
 WHERE id = ?;
 
--- name: GetTableAndFielsByTableName :one 
+-- name: GetTableAndFieldsByTableName :many 
 SELECT * FROM collections
 INNER JOIN table_fields
 ON table_fields.collection_id = collections.id

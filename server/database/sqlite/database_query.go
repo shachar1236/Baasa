@@ -1,4 +1,4 @@
-package database
+package sqlite
 
 import (
 	"context"
@@ -6,26 +6,27 @@ import (
 	"log"
 	"strings"
 
-	"github.com/shachar1236/Baasa/database/objects"
+	"github.com/shachar1236/Baasa/database/types"
 )
 
-func GetQueryById(ctx context.Context, id int64) (string, error) {
-    query, err := objects_queries.GetQueryById(ctx, id)
+func (this *SqliteDB) GetQueryById(ctx context.Context, id int64) (string, error) {
+    query, err := this.objects_queries.GetQueryById(ctx, id)
     if err != nil {
+        this.logger.Error("Cannot get query: ", err)
         return "", err
     }
     return query.Query, nil
 }
 
-func GetQuaryById(ctx context.Context, query_id int64) (objects.Query, error) {
+func (this *SqliteDB) GetQuaryById(ctx context.Context, query_id int64) (types.Query, error) {
     // getting query
-    query, err := objects_queries.GetQueryById(ctx, query_id)
-    return query, err
+    query, err := this.objects_queries.GetQueryById(ctx, query_id)
+    return types.Query(query), err
 }
 
 // runs query with filters and returns the result as json
 // return - json
-func RunQueryWithFilters(ctx context.Context, query objects.Query, args map[string]any, filters string) ([]byte, error) {
+func (this *SqliteDB) RunQueryWithFilters(ctx context.Context, query types.Query, args map[string]any, filters string) ([]byte, error) {
     var query_string string
     
     if filters != "" {
@@ -51,8 +52,9 @@ func RunQueryWithFilters(ctx context.Context, query objects.Query, args map[stri
     }
 
     // running query
-    query_result, err := db.NamedQueryContext(ctx, query_string, args)
+    query_result, err := this.db.NamedQueryContext(ctx, query_string, args)
     if err != nil {
+        this.logger.Error("Cannot run query: ", err)
         return nil, err
     }
 
@@ -62,6 +64,7 @@ func RunQueryWithFilters(ctx context.Context, query objects.Query, args map[stri
         res := make(map[string]interface{})
         err := query_result.MapScan(res)
         if err != nil {
+            this.logger.Error("Cannot run query: ", err)
             return nil, err
         }
         results = append(results, res)
@@ -71,10 +74,11 @@ func RunQueryWithFilters(ctx context.Context, query objects.Query, args map[stri
     return res, err
 }
 
-func RunQuery(query string, args map[string]any) ([]map[string]any, error) {
+func (this *SqliteDB) RunQuery(query string, args map[string]any) ([]map[string]any, error) {
     // running query
-    query_result, err := db.NamedQuery(query, args)
+    query_result, err := this.db.NamedQuery(query, args)
     if err != nil {
+        this.logger.Error("Cannot run query: ", err)
         return nil, err
     }
 
@@ -84,6 +88,7 @@ func RunQuery(query string, args map[string]any) ([]map[string]any, error) {
         res := make(map[string]interface{})
         err := query_result.MapScan(res)
         if err != nil {
+            this.logger.Error("Cannot run query: ", err)
             return nil, err
         }
         results = append(results, res)
@@ -92,9 +97,20 @@ func RunQuery(query string, args map[string]any) ([]map[string]any, error) {
     return results, nil
 }
 
-func RunCountQuery(query string, args []any) (int64, error) {
+func (this *SqliteDB) BasicCount(collection_name string, filters string, args []any) (int64, error) {
+    query_select := "SELECT COUNT(*) FROM "
+    query_where := " WHERE "
+
+    var sb strings.Builder
+    sb.Grow(len(query_select) + len(collection_name) + len(query_where) + len(filters) + 1)
+    sb.WriteString(query_select)
+    sb.WriteString(collection_name)
+    sb.WriteString(query_where)
+    sb.WriteString(filters)
+    sb.WriteString(";")
+
     var count int64
     // running query
-    err := db.Get(&count, query, args...)
+    err := this.db.Get(&count, sb.String(), args...)
     return count, err
 }

@@ -1,9 +1,11 @@
-package database
+package utils
 
 import (
 	"crypto/rand"
 	"encoding/hex"
 )
+
+const SESSION_SIZE = 32
 
 // generate secure 32 byte token
 func GenerateSecureToken() (string, error) {

@@ -2,69 +2,25 @@ package database
 
 import (
 	"context"
-	"database/sql"
-	_ "embed"
 
-	"github.com/jmoiron/sqlx"
-
-	_ "github.com/mattn/go-sqlite3"
-	"github.com/shachar1236/Baasa/database/objects"
+	"github.com/shachar1236/Baasa/database/types"
 )
 
-//go:embed schema.sql
-var ddl string
+type Database interface {
+    GetCollectionByName(ctx context.Context, name string) (types.Collection, error)
+    GetCollections(ctx context.Context) ([]types.Collection, error)
 
-var db *sqlx.DB
-var objects_queries *objects.Queries
+    GetQueryById(ctx context.Context, id int64) (string, error)
+    GetQuaryById(ctx context.Context, query_id int64) (types.Query, error)
+    RunQueryWithFilters(ctx context.Context, query types.Query, args map[string]any, filters string) ([]byte, error)
+    RunQuery(query string, args map[string]any) ([]map[string]any, error)
+    BasicCount(collection_name string, filter string, args []any) (int64, error)
 
-// tables
-var my_tables []Collection
-
-func Init(ctx context.Context) {
-	mydb, err := sqlx.Open("sqlite3", "database.db")
-	if err != nil {
-		panic(err)
-	}
-
-	// create tables
-	if _, err := mydb.ExecContext(ctx, ddl); err != nil {
-        panic(err)
-	}
-
-    db = mydb
-    objects_queries = objects.New(db)
-
-    // add users table to my_tables
-    my_tables = append(my_tables, Collection{
-        Name: "users",
-        Fields: []objects.TableField{
-            objects.TableField{
-                FieldName: "id",
-                FieldType: "INTEGER",
-                FieldOptions: sql.NullString{String:"PRIMARY KEY", Valid: true},
-            },
-            objects.TableField{
-                FieldName: "username",
-                FieldType: "TEXT",
-                FieldOptions: sql.NullString{String: "NOT NULL UNIQUE", Valid: true},
-            },
-            objects.TableField{
-                FieldName: "password_hash",
-                FieldType: "BLOB(32)",
-                FieldOptions: sql.NullString{String:"NOT NULL CHECK(length(password_hash) = 32)", Valid: true},
-            },
-            objects.TableField{
-                FieldName: "session",
-                FieldType: "TEXT",
-                FieldOptions: sql.NullString{String:"NOT NULL UNIQUE", Valid: true},
-            },
-        },
-    })
-
-    // create user tables
-    // tables, err := GetCollections(ctx)
-    if err != nil {
-        panic(err)
-    }
+    DoesUserExists(ctx context.Context, username string, password_hash types.PasswordHash) (bool, error)
+    DoesUserExistsById(ctx context.Context, id int64) (bool, error)
+    GetUserById(ctx context.Context, id int64) (types.User, error)
+    GetUserBySession(ctx context.Context, session string) (types.User, error)
+    CreateUser(ctx context.Context, username string, password string) (session string, err error)
+    GetUser(ctx context.Context, username string, password string) (types.User, error)
 }
 

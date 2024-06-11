@@ -186,14 +186,14 @@ func (q *Queries) GetQueryByQuery(ctx context.Context, query string) (Query, err
 	return i, err
 }
 
-const getTableAndFielsByTableName = `-- name: GetTableAndFielsByTableName :one
+const getTableAndFieldsByTableName = `-- name: GetTableAndFieldsByTableName :many
 SELECT collections.id, table_name, query_rules_directory_path, table_fields.id, collection_id, field_name, field_type, field_options FROM collections
 INNER JOIN table_fields
 ON table_fields.collection_id = collections.id
 WHERE collections.table_name = ?
 `
 
-type GetTableAndFielsByTableNameRow struct {
+type GetTableAndFieldsByTableNameRow struct {
 	ID                      int64
 	TableName               string
 	QueryRulesDirectoryPath string
@@ -204,20 +204,36 @@ type GetTableAndFielsByTableNameRow struct {
 	FieldOptions            sql.NullString
 }
 
-func (q *Queries) GetTableAndFielsByTableName(ctx context.Context, tableName string) (GetTableAndFielsByTableNameRow, error) {
-	row := q.db.QueryRowContext(ctx, getTableAndFielsByTableName, tableName)
-	var i GetTableAndFielsByTableNameRow
-	err := row.Scan(
-		&i.ID,
-		&i.TableName,
-		&i.QueryRulesDirectoryPath,
-		&i.ID_2,
-		&i.CollectionID,
-		&i.FieldName,
-		&i.FieldType,
-		&i.FieldOptions,
-	)
-	return i, err
+func (q *Queries) GetTableAndFieldsByTableName(ctx context.Context, tableName string) ([]GetTableAndFieldsByTableNameRow, error) {
+	rows, err := q.db.QueryContext(ctx, getTableAndFieldsByTableName, tableName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetTableAndFieldsByTableNameRow
+	for rows.Next() {
+		var i GetTableAndFieldsByTableNameRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TableName,
+			&i.QueryRulesDirectoryPath,
+			&i.ID_2,
+			&i.CollectionID,
+			&i.FieldName,
+			&i.FieldType,
+			&i.FieldOptions,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getUserById = `-- name: GetUserById :one
