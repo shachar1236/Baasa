@@ -2,6 +2,7 @@
     import CollectionsEditScreen from "./lib/collection/CollectionsEditScreen.svelte";
     import CollectionsRulesScreen from "./lib/collection/CollectionsRulesScreen.svelte";
     import { writable } from "svelte/store";
+    import CollectionsShowScreen from "./lib/collection/CollectionsShowScreen.svelte";
 
     let collection = {
         ID: 1,
@@ -25,17 +26,21 @@
         ],
     };
 
-    fetch(`/GetCollection?id=${collection.ID}`).then((response) => {
+    let id = new URLSearchParams(window.location.search).get("id");
+    fetch(`/GetCollection?id=${id}`).then((response) => {
         response.json().then((data) => {
+            console.log(data);
             collection = data;
         });
     });
+
+    $: my_collection = collection;
 
     let currentScreen = CollectionsEditScreen;
 </script>
 
 <main>
-    <h1 class="collection-heading">Collection</h1>
+    <h1 class="collection-heading">{collection.Name}</h1>
 
     <nav>
         <ul>
@@ -44,6 +49,11 @@
                     on:click={() => {
                         currentScreen = CollectionsEditScreen;
                     }}>Table</button
+                >
+            </li>
+            <li>
+                <button on:click={() => (currentScreen = CollectionsShowScreen)}
+                    >Data</button
                 >
             </li>
             <li>
@@ -56,7 +66,7 @@
     </nav>
     <hr />
 
-    <svelte:component this={currentScreen} {collection} />
+    <svelte:component this={currentScreen} collection={my_collection} />
 </main>
 
 <style>

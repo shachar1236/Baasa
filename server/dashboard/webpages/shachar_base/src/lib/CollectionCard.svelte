@@ -33,13 +33,15 @@
     </div>
     {#if !isPlus}
         <table>
-            {#each collection.Fields as _, i}
-                <tr>
-                    <td>{collection.Fields[i].FieldName}</td>
-                    <td>{collection.Fields[i].FieldType}</td>
-                    <td>{collection.Fields[i].FieldOptions.String}</td>
-                </tr>
-            {/each}
+            {#if collection.Fields != null}
+                {#each collection.Fields as _, i}
+                    <tr>
+                        <td>{collection.Fields[i].FieldName}</td>
+                        <td>{collection.Fields[i].FieldType}</td>
+                        <td>{collection.Fields[i].FieldOptions.String}</td>
+                    </tr>
+                {/each}
+            {/if}
         </table>
     {/if}
 </button>

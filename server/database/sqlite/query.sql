@@ -54,9 +54,7 @@ SELECT collections.id AS collection_id,
     table_fields.field_type,
     table_fields.field_options
 FROM collections
-LEFT JOIN table_fields
-ON table_fields.collection_id = collection_id
-WHERE collections.table_name = ?;
+    LEFT JOIN table_fields ON collections.id = table_fields.collection_id WHERE collections.table_name = ?;
 
 -- name: GetTableAndFieldsByTableId :many 
 SELECT collections.id AS collection_id,
@@ -67,8 +65,7 @@ SELECT collections.id AS collection_id,
     table_fields.field_type,
     table_fields.field_options
 FROM collections
-LEFT JOIN table_fields
-ON table_fields.collection_id = collection_id
+    LEFT JOIN table_fields ON collections.id = table_fields.collection_id
 WHERE collections.id = ?;
 
 -- name: GetAllTablesAndFields :many
@@ -82,7 +79,7 @@ SELECT collections.id AS collection_id,
 FROM collections 
 LEFT JOIN table_fields ON collections.id = table_fields.collection_id;
 
--- name: CreateTable :one
+-- name: CreateCollection :one
 INSERT INTO collections (table_name)
 VALUES (?) RETURNING *;
 
@@ -92,3 +89,19 @@ VALUES (?, ?, ?, ?);
 
 -- name: DeleteCollection :exec
 DELETE FROM collections WHERE table_name = ?;
+
+-- name: ChangeTableName :exec
+UPDATE collections SET table_name = sqlc.arg(new_name) WHERE table_name = sqlc.arg(old_name);
+
+-- name: ChangeFieldName :exec
+UPDATE table_fields SET field_name = ? WHERE id = ?;
+
+-- name: ChangeFieldType :exec
+UPDATE table_fields SET field_type = ? WHERE id = ?;
+
+-- name: ChangeFieldOptions :exec
+UPDATE table_fields SET field_options = ? WHERE id = ?;
+
+-- name: DeleteField :exec
+DELETE FROM table_fields
+WHERE id = ?;

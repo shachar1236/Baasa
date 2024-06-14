@@ -10,6 +10,62 @@ import (
 	"database/sql"
 )
 
+const changeFieldName = `-- name: ChangeFieldName :exec
+UPDATE table_fields SET field_name = ? WHERE id = ?
+`
+
+type ChangeFieldNameParams struct {
+	FieldName string
+	ID        int64
+}
+
+func (q *Queries) ChangeFieldName(ctx context.Context, arg ChangeFieldNameParams) error {
+	_, err := q.db.ExecContext(ctx, changeFieldName, arg.FieldName, arg.ID)
+	return err
+}
+
+const changeFieldOptions = `-- name: ChangeFieldOptions :exec
+UPDATE table_fields SET field_options = ? WHERE id = ?
+`
+
+type ChangeFieldOptionsParams struct {
+	FieldOptions sql.NullString
+	ID           int64
+}
+
+func (q *Queries) ChangeFieldOptions(ctx context.Context, arg ChangeFieldOptionsParams) error {
+	_, err := q.db.ExecContext(ctx, changeFieldOptions, arg.FieldOptions, arg.ID)
+	return err
+}
+
+const changeFieldType = `-- name: ChangeFieldType :exec
+UPDATE table_fields SET field_type = ? WHERE id = ?
+`
+
+type ChangeFieldTypeParams struct {
+	FieldType string
+	ID        int64
+}
+
+func (q *Queries) ChangeFieldType(ctx context.Context, arg ChangeFieldTypeParams) error {
+	_, err := q.db.ExecContext(ctx, changeFieldType, arg.FieldType, arg.ID)
+	return err
+}
+
+const changeTableName = `-- name: ChangeTableName :exec
+UPDATE collections SET table_name = ?1 WHERE table_name = ?2
+`
+
+type ChangeTableNameParams struct {
+	NewName string
+	OldName string
+}
+
+func (q *Queries) ChangeTableName(ctx context.Context, arg ChangeTableNameParams) error {
+	_, err := q.db.ExecContext(ctx, changeTableName, arg.NewName, arg.OldName)
+	return err
+}
+
 const countUsersWithId = `-- name: CountUsersWithId :one
 SELECT count(*) 
 FROM users
@@ -39,6 +95,18 @@ func (q *Queries) CountUsersWithNameAndPassword(ctx context.Context, arg CountUs
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const createCollection = `-- name: CreateCollection :one
+INSERT INTO collections (table_name)
+VALUES (?) RETURNING id, table_name, query_rules_directory_path
+`
+
+func (q *Queries) CreateCollection(ctx context.Context, tableName string) (Collection, error) {
+	row := q.db.QueryRowContext(ctx, createCollection, tableName)
+	var i Collection
+	err := row.Scan(&i.ID, &i.TableName, &i.QueryRulesDirectoryPath)
+	return i, err
 }
 
 const createField = `-- name: CreateField :exec
@@ -73,18 +141,6 @@ func (q *Queries) CreateQuery(ctx context.Context, query string) error {
 	return err
 }
 
-const createTable = `-- name: CreateTable :one
-INSERT INTO collections (table_name)
-VALUES (?) RETURNING id, table_name, query_rules_directory_path
-`
-
-func (q *Queries) CreateTable(ctx context.Context, tableName string) (Collection, error) {
-	row := q.db.QueryRowContext(ctx, createTable, tableName)
-	var i Collection
-	err := row.Scan(&i.ID, &i.TableName, &i.QueryRulesDirectoryPath)
-	return i, err
-}
-
 const createUser = `-- name: CreateUser :exec
 INSERT INTO users (username, password_hash, session)
 VALUES (?, ?, ?)
@@ -107,6 +163,16 @@ DELETE FROM collections WHERE table_name = ?
 
 func (q *Queries) DeleteCollection(ctx context.Context, tableName string) error {
 	_, err := q.db.ExecContext(ctx, deleteCollection, tableName)
+	return err
+}
+
+const deleteField = `-- name: DeleteField :exec
+DELETE FROM table_fields
+WHERE id = ?
+`
+
+func (q *Queries) DeleteField(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, deleteField, id)
 	return err
 }
 
@@ -206,8 +272,7 @@ SELECT collections.id AS collection_id,
     table_fields.field_type,
     table_fields.field_options
 FROM collections
-LEFT JOIN table_fields
-ON table_fields.collection_id = collection_id
+    LEFT JOIN table_fields ON collections.id = table_fields.collection_id
 WHERE collections.id = ?
 `
 
@@ -261,9 +326,7 @@ SELECT collections.id AS collection_id,
     table_fields.field_type,
     table_fields.field_options
 FROM collections
-LEFT JOIN table_fields
-ON table_fields.collection_id = collection_id
-WHERE collections.table_name = ?
+    LEFT JOIN table_fields ON collections.id = table_fields.collection_id WHERE collections.table_name = ?
 `
 
 type GetTableAndFieldsByTableNameRow struct {

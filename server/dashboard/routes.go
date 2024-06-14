@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/shachar1236/Baasa/database"
+	"github.com/shachar1236/Baasa/database/types"
 )
 
 func addRoutes(mux *http.ServeMux, logger *slog.Logger, db database.Database, admin_exists *bool, admin_session *string) {
@@ -24,11 +25,12 @@ func addRoutes(mux *http.ServeMux, logger *slog.Logger, db database.Database, ad
     mux.Handle("GET /register", adminDosentExists(handleRegisterGet(logger)))
     mux.Handle("GET /login", guestOnly(handleLoginGet(logger)))
 
-    mux.Handle("/collection", adminOnly(handleCollection(logger)))
+    mux.Handle("GET /collection", adminOnly(handleCollection(logger)))
     mux.Handle("GET /GetCollections", adminOnly(handleGetCollections(logger, db)))
     mux.Handle("GET /GetCollection", adminOnly(handleGetCollection(logger, db)))
     mux.Handle("POST /AddCollection", adminOnly(handleAddCollection(logger, db)))
     mux.Handle("DELETE /DeleteCollection", adminOnly(handleDeleteCollection(logger, db)))
+    mux.Handle("POST /SaveCollectionChanges", adminOnly(handleSaveCollectionChanges(logger, db)))
 }
 
 func handleHome(logger *slog.Logger) http.HandlerFunc {
@@ -150,13 +152,21 @@ func handleGetCollections(logger *slog.Logger, db database.Database) http.Handle
 func handleGetCollection(logger *slog.Logger, db database.Database) http.HandlerFunc {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-            q := r.URL.Query()
-            collection_id, err := strconv.Atoi(q.Get("id"))
+            err := r.ParseForm()
+            if err != nil {
+                logger.Error("Got error while trying to parse form: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                return
+            }
+
+            collection_id, err := strconv.Atoi(r.Form.Get("id"))
             if err != nil {
                 logger.Error("Got error while trying to retrieve collection: " + err.Error())
                 w.WriteHeader(http.StatusBadRequest)
                 return
             }
+
+            logger.Info("Got collection id: " + strconv.Itoa(collection_id))
             
             collection, err := db.GetCollectionById(r.Context(), int64(collection_id))
             err = encode(w, r, http.StatusOK, collection)
@@ -205,3 +215,24 @@ func handleDeleteCollection(logger *slog.Logger, db database.Database) http.Hand
         },
     )
 }
+
+func handleSaveCollectionChanges(logger *slog.Logger, db database.Database) http.HandlerFunc {
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+            // TODO: change to decodeValid to see if the changes the user has made are valid
+            collection, err := decode[types.Collection](r);
+            if err != nil {
+                logger.Error("Got error while trying to decode collection: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                return
+            }
+            err = db.SaveCollectionChanges(r.Context(), collection)
+            if err != nil {
+                logger.Error("Got error while trying to save collection: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                return
+            }
+        },
+    )
+}
+
