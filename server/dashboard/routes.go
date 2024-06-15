@@ -9,6 +9,8 @@ import (
 	"github.com/shachar1236/Baasa/database/types"
 )
 
+
+
 func addRoutes(mux *http.ServeMux, logger *slog.Logger, db database.Database, admin_exists *bool, admin_session *string) {
     fs := http.FileServer(http.Dir("./dashboard/webpages/shachar_base/dist/assets/"))
 	mux.Handle("/assets/", http.StripPrefix("/assets/", fs))
@@ -31,6 +33,11 @@ func addRoutes(mux *http.ServeMux, logger *slog.Logger, db database.Database, ad
     mux.Handle("POST /AddCollection", adminOnly(handleAddCollection(logger, db)))
     mux.Handle("DELETE /DeleteCollection", adminOnly(handleDeleteCollection(logger, db)))
     mux.Handle("POST /SaveCollectionChanges", adminOnly(handleSaveCollectionChanges(logger, db)))
+
+    mux.Handle("POST /SetById", adminOnly(handleSetById(logger, db)))
+    mux.Handle("DELETE /DeleteById", adminOnly(handleDeleteById(logger, db)))
+    mux.Handle("POST /AddWithArgs", adminOnly(handleAddWithArgs(logger, db)))
+    mux.Handle("/GetData", adminOnly(handleGetData(logger, db)))
 }
 
 func handleHome(logger *slog.Logger) http.HandlerFunc {
@@ -232,6 +239,129 @@ func handleSaveCollectionChanges(logger *slog.Logger, db database.Database) http
                 w.WriteHeader(http.StatusBadRequest)
                 return
             }
+        },
+    )
+}
+
+func handleSetById(logger *slog.Logger, db database.Database) http.HandlerFunc {
+    type setMsg struct {
+        CollectionName string `json:"collection_name"`
+        ColumnName string `json:"column_name"`
+        Id int64 `json:"id"`
+        To any `json:"to"`
+    }
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+            params, err := decode[setMsg](r)
+            if err != nil {
+                logger.Error("Got error while trying to decode setMsg: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                return
+            }
+
+            err = db.ActionSetById(r.Context(), params.CollectionName, params.ColumnName, params.Id, params.To)
+            if err != nil {
+                logger.Error("Got error while trying to set by id: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                encode(w, r, http.StatusBadRequest, err)
+                return
+            }
+            w.WriteHeader(http.StatusOK)
+        },
+    )
+}
+
+func handleGetData(logger *slog.Logger, db database.Database) http.HandlerFunc {
+    type msg struct {
+        Collection_name string `json:"collection_name"`
+        From int64 `json:"from"`
+        To int64 `json:"to"`
+    }
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+            params, err := decode[msg](r)
+            if err != nil {
+                logger.Error("Got error while trying to decode msg: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                encode(w, r, http.StatusBadRequest, err)
+                return
+            }
+
+            data, err := db.ActionGetCollectionDataWithLimit(r.Context(), params.Collection_name, params.From, params.To)
+            if err != nil {
+                logger.Error("Got error while trying to get data: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                encode(w, r, http.StatusBadRequest, err)
+                return
+            }
+
+            err = encode(w, r, http.StatusOK, data)
+            if err != nil {
+                logger.Error("Got error while trying to encode data: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                encode(w, r, http.StatusBadRequest, err)
+                return
+            }
+        },
+    )
+}
+
+func handleDeleteById(logger *slog.Logger, db database.Database) http.HandlerFunc {
+    type deleteMsg struct {
+        CollectionName string `json:"collection_name"`
+        Id int64 `json:"id"`
+    }
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+            params, err := decode[deleteMsg](r)
+            if err != nil {
+                logger.Error("Got error while trying to decode deleteMsg: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                return
+            }
+
+            err = db.ActionDeleteById(r.Context(), params.CollectionName, params.Id)
+            if err != nil {
+                logger.Error("Got error while trying to delete by id: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                encode(w, r, http.StatusBadRequest, err)
+                return
+            }
+            w.WriteHeader(http.StatusOK)
+        },
+    )
+}
+
+func handleAddWithArgs(logger *slog.Logger, db database.Database) http.HandlerFunc {
+    type addMsg struct {
+        CollectionName string `json:"collection_name"`
+        Args map[string]any `json:"args"`
+    }
+
+    type retMsg struct {
+        Id int64 `json:"id"`
+    }
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+
+            params, err := decode[addMsg](r)
+            if err != nil {
+                logger.Error("Got error while trying to decode addMsg: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                return
+            }
+            
+            id, err := db.ActionAdd(r.Context(), params.CollectionName, params.Args)
+            if err != nil {
+                logger.Error("Got error while trying to add with args: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                encode(w, r, http.StatusBadRequest, err)
+                return
+            }
+            encode(w, r, http.StatusOK, retMsg{
+                Id: id,
+            })
+            w.WriteHeader(http.StatusOK)
         },
     )
 }

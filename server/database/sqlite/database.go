@@ -17,6 +17,10 @@ import (
 //go:embed schema.sql
 var ddl string
 
+type SqlTypes interface{
+    int64 | float64| string | []byte 
+}
+
 type SqliteDB struct {
     db *sqlx.DB
     objects_queries *objects.Queries
@@ -87,3 +91,17 @@ func New(ctx context.Context) (SqliteDB, error) {
     return this, nil
 }
 
+func sqlxRowsToMapStringAny(query_result *sqlx.Rows) ([]map[string]any, error) {
+    var results []map[string]any
+
+    for query_result.Next() {
+        res := make(map[string]interface{})
+        err := query_result.MapScan(res)
+        if err != nil {
+            return nil, err
+        }
+        results = append(results, res)
+    }
+
+    return results, nil
+}

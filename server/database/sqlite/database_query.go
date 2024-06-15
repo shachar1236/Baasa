@@ -60,14 +60,10 @@ func (this *SqliteDB) RunQueryWithFilters(ctx context.Context, query types.Query
 
     var results []map[string]any
 
-    for query_result.Next() {
-        res := make(map[string]interface{})
-        err := query_result.MapScan(res)
-        if err != nil {
-            this.logger.Error("Cannot run query: ", err)
-            return nil, err
-        }
-        results = append(results, res)
+    results, err = sqlxRowsToMapStringAny(query_result)
+    if err != nil {
+        this.logger.Error("Cannot run query: ", err)
+        return nil, err
     }
 
     res, err := json.Marshal(results)

@@ -20,6 +20,11 @@ type Database interface {
     RunQuery(query string, args map[string]any) ([]map[string]any, error)
     BasicCount(collection_name string, filter string, args []any) (int64, error)
 
+    ActionSetById(ctx context.Context, collection_name string, column_name string, id int64, to any) error
+    ActionGetCollectionDataWithLimit(ctx context.Context, collection_name string, from int64, to int64) ([]map[string]any, error)
+    ActionDeleteById(ctx context.Context, collection_name string, id int64) error
+    ActionAdd(ctx context.Context, collection_name string, args map[string]any) (int64, error)
+
     DoesUserExists(ctx context.Context, username string, password_hash types.PasswordHash) (bool, error)
     DoesUserExistsById(ctx context.Context, id int64) (bool, error)
     GetUserById(ctx context.Context, id int64) (types.User, error)

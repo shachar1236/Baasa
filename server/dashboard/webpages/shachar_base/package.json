@@ -17,6 +17,7 @@
     "@brillout/vite-plugin-ssr": "^0.4.55",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "svelte-simple-modal": "^1.6.2",
     "vite-plugin-ssr": "^0.4.142"
   }
 }

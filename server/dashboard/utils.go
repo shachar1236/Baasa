@@ -7,6 +7,10 @@ import (
 	"net/http"
 )
 
+type ErrorMessage struct {
+    Message string `json:"error"`
+}
+
 // Validator is an object that can be validated.
 type Validator interface {
 	// Valid checks the object and returns any

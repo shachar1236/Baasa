@@ -242,7 +242,7 @@ func (this *SqliteDB) SaveCollectionChanges(ctx context.Context, new_collection 
 	var copy_query strings.Builder
 	copy_query.WriteString("INSERT INTO ")
 	copy_query.WriteString(new_collection.Name)
-	copy_query.WriteString("(")
+	copy_query.WriteString(" (")
 	var new_fields_strings []string
 
 	var if_succeds []func()
@@ -318,6 +318,7 @@ func (this *SqliteDB) SaveCollectionChanges(ctx context.Context, new_collection 
 		if !field_exists {
 			// there is a new field
 			needs_to_create_new = true
+			needs_to_copy = true
 
 			if_succeds = append(if_succeds, func() {
 				err := this.objects_queries.CreateField(ctx, objects.CreateFieldParams{
@@ -346,7 +347,8 @@ func (this *SqliteDB) SaveCollectionChanges(ctx context.Context, new_collection 
 		}
 
 		if !fields_exists {
-            needs_to_create_new = true
+			needs_to_create_new = true
+			needs_to_copy = true
 
 			if_succeds = append(if_succeds, func() {
 				err := this.objects_queries.DeleteField(ctx, old_field.ID)
@@ -372,32 +374,41 @@ func (this *SqliteDB) SaveCollectionChanges(ctx context.Context, new_collection 
 
 		// creating new table
 		create_query := getAddTableQueryForCollection(ctx, new_collection)
-        logger.Info("new table create query: " + create_query)
+		logger.Info("new table create query: " + create_query)
 		_, err = this.db.Exec(create_query)
 		if err != nil {
 			err = errors.New("Cant create new table: " + err.Error())
 			logger.Info("new table create query: " + create_query)
 			logger.Error(err.Error())
+			// reverting table name change
+			this.changeCollectionTableName(ctx, changed_collection_name, new_collection.Name)
+			// returning error
 			return err
 		}
 
 		// copying table
-		if needs_to_copy {
+		if needs_to_copy && len(old_collection.Fields) > 0 {
 			fields_string := strings.Join(new_fields_strings, ", ")
 			copy_query.WriteString(fields_string)
 			copy_query.WriteString(") ")
 			copy_query.WriteString("SELECT ")
 			copy_query.WriteString(fields_string)
-			copy_query.WriteString(") ")
 			copy_query.WriteString(" FROM ")
 			copy_query.WriteString(changed_collection_name)
 			copy_query.WriteString(";")
+
+			logger.Info("copy query: " + copy_query.String())
 
 			_, err = this.db.Exec(copy_query.String())
 			if err != nil {
 				err = errors.New("Cant copy collection: " + err.Error())
 				logger.Info("copy query: " + copy_query.String())
 				logger.Error(err.Error())
+                // droping new table
+                this.dropTable(ctx, new_collection.Name)
+				// reverting table name change
+				this.changeCollectionTableName(ctx, changed_collection_name, new_collection.Name)
+				// returning error
 				return err
 			}
 

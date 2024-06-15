@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS collections (
     id   INTEGER PRIMARY KEY,
     table_name text NOT NULL UNIQUE,
-    query_rules_directory_path text NOT NULL
+    -- query_rules_directory_path  should look like this "access_rules/rules/{id}/"
+    query_rules_directory_path text NOT NULL GENERATED ALWAYS AS ("access_rules/rules/" || id || "/") STORED
 );
 
 -- table_fields table 
