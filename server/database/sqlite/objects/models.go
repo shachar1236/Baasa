@@ -16,6 +16,7 @@ type Collection struct {
 
 type Query struct {
 	ID                 int64
+	Name               string
 	Query              string
 	QueryRulesFilePath string
 }

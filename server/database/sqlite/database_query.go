@@ -3,19 +3,58 @@ package sqlite
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"log"
+	"os"
 	"strings"
 
+	"github.com/shachar1236/Baasa/database/sqlite/objects"
 	"github.com/shachar1236/Baasa/database/types"
 )
 
-func (this *SqliteDB) GetQueryById(ctx context.Context, id int64) (string, error) {
-    query, err := this.objects_queries.GetQueryById(ctx, id)
+func (this *SqliteDB) CreateQuery(ctx context.Context, name string) (types.Query, error) {
+    res, err := this.objects_queries.CreateQuery(ctx, name)
+    return types.Query(res), err
+}
+
+func (this *SqliteDB) GetQuaries(ctx context.Context) ([]types.Query, error) {
+    res, err := this.objects_queries.GetQueries(ctx)
+    if err != nil {
+        this.logger.Error("Cannot get queries: ", err)
+        return nil, err
+    }
+    ret := make([]types.Query, len(res))
+    for i, q := range res {
+        ret[i] = types.Query(q)
+    }
+
+    return ret, err
+}
+
+func (this *SqliteDB) UpdateQuaryById(ctx context.Context, query_id int64, query string) error {
+    err := this.objects_queries.UpdateQueryById(ctx, objects.UpdateQueryByIdParams{
+        Query: query,
+        ID: query_id,
+    })
+    return err
+}
+
+func (this *SqliteDB) DeleteQuaryById(ctx context.Context, query_id int64) error {
+    // getting query
+    query, err := this.objects_queries.GetQueryById(ctx, query_id)
     if err != nil {
         this.logger.Error("Cannot get query: ", err)
-        return "", err
+        return err
     }
-    return query.Query, nil
+    // removing query file
+    err = os.Remove(query.QueryRulesFilePath)
+    if err != nil {
+        this.logger.Error("Cannot remove query file: ", err)
+        return err
+    }
+    err = this.objects_queries.DeleteQueryById(ctx, query_id)
+    return err
 }
 
 func (this *SqliteDB) GetQuaryById(ctx context.Context, query_id int64) (types.Query, error) {
@@ -24,6 +63,68 @@ func (this *SqliteDB) GetQuaryById(ctx context.Context, query_id int64) (types.Q
     return types.Query(query), err
 }
 
+func (this *SqliteDB) GetQueryRules(ctx context.Context, query_id int64) (string, error) {
+    query, err := this.GetQuaryById(ctx, query_id)
+    if err != nil {
+        this.logger.Error("Cannot get query: ", err)
+        return "", err
+    }
+
+    file, err := os.Open(query.QueryRulesFilePath)
+    
+    if err != nil {
+        if errors.Is(err, os.ErrNotExist) {
+            file, err = os.Create(query.QueryRulesFilePath)
+            if err != nil {
+                this.logger.Error("Cannot create file: ", err)
+                return "", err
+            }
+            return "", nil
+        } else {
+            this.logger.Error("Cannot open file: ", err)
+            return "", err
+        }
+    }
+    defer file.Close()
+
+    content, err := io.ReadAll(file)
+    
+    return string(content), err
+}
+
+func (this *SqliteDB) SetQueryRules(ctx context.Context, query_id int64, new_rules string) error {
+    query, err := this.GetQuaryById(ctx, query_id)
+    if err != nil {
+        this.logger.Error("Cannot get query: ", err)
+        return err
+    }
+
+    file, err := os.OpenFile(query.QueryRulesFilePath, os.O_WRONLY, 0644)
+    
+    if err != nil {
+        if errors.Is(err, os.ErrNotExist) {
+            file, err = os.Create(query.QueryRulesFilePath)
+            if err != nil {
+                this.logger.Error("Cannot create file: ", err)
+                return err
+            }
+        } else {
+            this.logger.Error("Cannot open file: ", err)
+            return err
+        }
+    }
+    defer file.Close()
+
+    // remove all contents of file and write new rules
+    err = file.Truncate(0)
+    if err != nil {
+        this.logger.Error("Cannot truncate file: ", err)
+        return err
+    }
+    _, err = file.WriteString(new_rules)
+    
+    return err
+}
 // runs query with filters and returns the result as json
 // return - json
 func (this *SqliteDB) RunQueryWithFilters(ctx context.Context, query types.Query, args map[string]any, filters string) ([]byte, error) {

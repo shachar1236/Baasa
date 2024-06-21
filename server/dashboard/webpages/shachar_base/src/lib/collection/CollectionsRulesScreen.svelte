@@ -1,4 +1,7 @@
 <script>
+    import TextEditor from "../TextEditor.svelte";
+    import RulesEditor from "../TextEditor.svelte";
+
     export let collection;
 </script>
 
@@ -23,7 +26,7 @@
                 </li>
             </ul>
         </nav>
-        <textarea rows="10" cols="50" placeholder="Enter Rules Here"></textarea>
+        <TextEditor></TextEditor>
     </div>
 </div>
 
@@ -68,15 +71,5 @@
     /* remove border outline after clinking on button */
     li button:focus {
         outline: none;
-    }
-
-    textarea {
-        width: 100%;
-        resize: none;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        padding: 10px;
-        margin: 1rem;
-        background-color: #1a1a1a;
     }
 </style>

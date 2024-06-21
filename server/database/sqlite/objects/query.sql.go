@@ -131,14 +131,21 @@ func (q *Queries) CreateField(ctx context.Context, arg CreateFieldParams) error 
 	return err
 }
 
-const createQuery = `-- name: CreateQuery :exec
-INSERT INTO queries (query)
-VALUES (?)
+const createQuery = `-- name: CreateQuery :one
+INSERT INTO queries (name)
+VALUES (?) RETURNING id, name, "query", query_rules_file_path
 `
 
-func (q *Queries) CreateQuery(ctx context.Context, query string) error {
-	_, err := q.db.ExecContext(ctx, createQuery, query)
-	return err
+func (q *Queries) CreateQuery(ctx context.Context, name string) (Query, error) {
+	row := q.db.QueryRowContext(ctx, createQuery, name)
+	var i Query
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Query,
+		&i.QueryRulesFilePath,
+	)
+	return i, err
 }
 
 const createUser = `-- name: CreateUser :exec
@@ -239,27 +246,69 @@ func (q *Queries) GetAllTablesAndFields(ctx context.Context) ([]GetAllTablesAndF
 	return items, nil
 }
 
+const getQueries = `-- name: GetQueries :many
+SELECT id, name, "query", query_rules_file_path FROM queries
+`
+
+func (q *Queries) GetQueries(ctx context.Context) ([]Query, error) {
+	rows, err := q.db.QueryContext(ctx, getQueries)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Query
+	for rows.Next() {
+		var i Query
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Query,
+			&i.QueryRulesFilePath,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getQueryById = `-- name: GetQueryById :one
-SELECT id, "query", query_rules_file_path FROM queries
+SELECT id, name, "query", query_rules_file_path FROM queries
 WHERE id = ? LIMIT 1
 `
 
 func (q *Queries) GetQueryById(ctx context.Context, id int64) (Query, error) {
 	row := q.db.QueryRowContext(ctx, getQueryById, id)
 	var i Query
-	err := row.Scan(&i.ID, &i.Query, &i.QueryRulesFilePath)
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Query,
+		&i.QueryRulesFilePath,
+	)
 	return i, err
 }
 
 const getQueryByQuery = `-- name: GetQueryByQuery :one
-SELECT id, "query", query_rules_file_path FROM queries
+SELECT id, name, "query", query_rules_file_path FROM queries
 WHERE query = ? LIMIT 1
 `
 
 func (q *Queries) GetQueryByQuery(ctx context.Context, query string) (Query, error) {
 	row := q.db.QueryRowContext(ctx, getQueryByQuery, query)
 	var i Query
-	err := row.Scan(&i.ID, &i.Query, &i.QueryRulesFilePath)
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Query,
+		&i.QueryRulesFilePath,
+	)
 	return i, err
 }
 

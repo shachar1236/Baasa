@@ -24,13 +24,16 @@ WHERE id = ? LIMIT 1;
 INSERT INTO users (username, password_hash, session)
 VALUES (?, ?, ?);
 
--- name: CreateQuery :exec
-INSERT INTO queries (query)
-VALUES (?);
+-- name: CreateQuery :one
+INSERT INTO queries (name)
+VALUES (?) RETURNING *;
 
 -- name: GetQueryById :one
 SELECT * FROM queries
 WHERE id = ? LIMIT 1;
+
+-- name: GetQueries :many
+SELECT * FROM queries;
 
 -- name: GetQueryByQuery :one
 SELECT * FROM queries

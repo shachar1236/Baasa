@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -38,6 +39,14 @@ func addRoutes(mux *http.ServeMux, logger *slog.Logger, db database.Database, ad
     mux.Handle("DELETE /DeleteById", adminOnly(handleDeleteById(logger, db)))
     mux.Handle("POST /AddWithArgs", adminOnly(handleAddWithArgs(logger, db)))
     mux.Handle("/GetData", adminOnly(handleGetData(logger, db)))
+
+    mux.Handle("GET /GetQueries", adminOnly(handleGetQueries(logger, db)))
+    mux.Handle("POST /AddQuery", adminOnly(handleAddQuery(logger, db)))
+    mux.Handle("POST /SetQuery", adminOnly(handleSetQuery(logger, db)))
+    mux.Handle("DELETE /DeleteQuery", adminOnly(handleDeleteQuery(logger, db)))
+
+    mux.Handle("GET /GetQueryRules", adminOnly(handleGetQueryRules(logger, db)))
+    mux.Handle("POST /SetQueryRules", adminOnly(handleSetQueryRules(logger, db)))
 }
 
 func handleHome(logger *slog.Logger) http.HandlerFunc {
@@ -366,3 +375,175 @@ func handleAddWithArgs(logger *slog.Logger, db database.Database) http.HandlerFu
     )
 }
 
+func handleGetQueries(logger *slog.Logger, db database.Database) http.HandlerFunc {
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+            queries, err := db.GetQuaries(r.Context())
+            if err != nil {
+                logger.Error("Got error while trying to retrieve queries: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                encode(w, r, http.StatusBadRequest, err.Error())
+                return
+            }
+
+            logger.Info("Retrieved queries: " + fmt.Sprint(queries))
+            
+            err = encode(w, r, http.StatusOK, queries)
+            if err != nil {
+                logger.Error("Got error while trying to encode queries: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                return
+            }
+        },
+    )
+}
+
+func handleAddQuery(logger *slog.Logger, db database.Database) http.HandlerFunc {
+    type addMsg struct {
+        Name string `json:"name"`
+    }
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+            params, err := decode[addMsg](r)
+            if err != nil {
+                logger.Error("Got error while trying to decode addMsg: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                return
+            }
+
+            q, err := db.CreateQuery(r.Context(), params.Name)
+            if err != nil {
+                logger.Error("Got error while trying to add query: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                encode(w, r, http.StatusBadRequest, err)
+                return
+            }
+
+            encode(w, r, http.StatusOK, q)
+        },
+    )
+}
+
+func handleSetQuery(logger *slog.Logger, db database.Database) http.HandlerFunc {
+    type setMsg struct {
+        ID int64 `json:"ID"`
+        Query string `json:"Query"`
+    }
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+            params, err := decode[setMsg](r)
+            if err != nil {
+                logger.Error("Got error while trying to decode setMsg: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                encode(w, r, http.StatusBadRequest, err.Error())
+                return
+            }
+
+            logger.Info("Got query to update: " + params.Query)
+
+            err = db.UpdateQuaryById(r.Context(), params.ID, params.Query)
+            if err != nil {
+                logger.Error("Got error while trying to change query: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                encode(w, r, http.StatusBadRequest, err.Error())
+                return
+            }
+
+
+            w.WriteHeader(http.StatusOK)
+        },
+    )
+}
+
+func handleDeleteQuery(logger *slog.Logger, db database.Database) http.HandlerFunc {
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+            err := r.ParseForm()
+            if err != nil {
+                logger.Error("Got error while trying to decode deleteMsg: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                encode(w, r, http.StatusBadRequest, err.Error())
+                return
+            }
+
+            id, err := strconv.Atoi(r.Form.Get("id"))
+            if err != nil {
+                logger.Error("Got error while trying to retrieve query: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                encode(w, r, http.StatusBadRequest, err.Error())
+                return
+            }
+
+            err = db.DeleteQuaryById(r.Context(), int64(id))
+            if err != nil {
+                logger.Error("Got error while trying to delete query: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                encode(w, r, http.StatusBadRequest, err.Error())
+                return
+            }
+
+
+            w.WriteHeader(http.StatusOK)
+        },
+    )
+}
+
+func handleGetQueryRules(logger *slog.Logger, db database.Database) http.HandlerFunc {
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+            err := r.ParseForm()
+            if err != nil {
+                logger.Error("Got error while trying to decode id: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                encode(w, r, http.StatusBadRequest, err.Error())
+                return
+            }
+
+            id, err := strconv.Atoi(r.Form.Get("query_id"))
+            if err != nil {
+                logger.Error("Got error while trying to decode id: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                encode(w, r, http.StatusBadRequest, err.Error())
+                return
+            }
+
+            rules, err := db.GetQueryRules(r.Context(), int64(id))
+            if err != nil {
+                logger.Error("Got error while trying to retrieve rules: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                encode(w, r, http.StatusBadRequest, err.Error())
+                return
+            }
+
+            encode(w, r, http.StatusOK, rules)
+        },
+    )
+}
+
+func handleSetQueryRules(logger *slog.Logger, db database.Database) http.HandlerFunc {
+    type setMsg struct {
+        ID int64 `json:"ID"`
+        NewRules string `json:"new_rules"`
+    }
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+            params, err := decode[setMsg](r)
+            if err != nil {
+                logger.Error("Got error while trying to decode setMsg: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                encode(w, r, http.StatusBadRequest, err.Error())
+                return
+            }
+
+            err = db.SetQueryRules(r.Context(), params.ID, params.NewRules)
+            if err != nil {
+                logger.Error("Got error while trying to change query rules: " + err.Error())
+                w.WriteHeader(http.StatusBadRequest)
+                encode(w, r, http.StatusBadRequest, err.Error())
+                return
+            }
+
+            w.WriteHeader(http.StatusOK)
+        },
+    )
+}

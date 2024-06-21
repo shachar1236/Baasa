@@ -14,4 +14,7 @@ export default defineConfig({
             },
         },
     },
+    optimizeDeps: {
+        exclude: ["codemirror", "@codemirror/language-javascript" /* ... */],
+    },
 });

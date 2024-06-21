@@ -1,6 +1,9 @@
 <script>
+    import CollectionsHomeScreen from "./lib/home/CollectionsHomeScreen.svelte";
+
     import Collection from "./collection.svelte";
     import CollectionCard from "./lib/CollectionCard.svelte";
+    import QueriesHomeScreen from "./lib/home/QueriesHomeScreen.svelte";
 
     let collections = [
         {
@@ -89,6 +92,8 @@
         },
     ];
 
+    let currentScreen = CollectionsHomeScreen;
+
     fetch("/GetCollections").then((response) => {
         response.json().then((data) => {
             collections = data;
@@ -120,19 +125,26 @@
 </script>
 
 <main>
-    <div class="collections-screen">
+    <div class="main-screen">
         <h1 class="home-heading">Shachar Base</h1>
+        <nav>
+            <ul>
+                <li>
+                    <button
+                        on:click={() => (currentScreen = CollectionsHomeScreen)}
+                        >Collections</button
+                    >
+                </li>
+                <li>
+                    <button on:click={() => (currentScreen = QueriesHomeScreen)}
+                        >Queries</button
+                    >
+                </li>
+            </ul>
+        </nav>
         <hr />
-        <div class="cards-div">
-            {#each collections as collection}
-                <CollectionCard
-                    onClick={() => openCollection(collection)}
-                    deleteFunc={deleteCollection}
-                    {collection}
-                />
-            {/each}
-            <CollectionCard isPlus={true} onClick={() => addCollection()} />
-        </div>
+
+        <svelte:component this={currentScreen} {collections} />
     </div>
 </main>
 
@@ -142,7 +154,34 @@
         display: flex;
     }
 
-    .collections-screen {
+    nav {
+        overflow: hidden;
+    }
+
+    nav ul {
+        list-style-type: none;
+        padding: 0;
+        overflow: hidden;
+    }
+
+    nav li {
+        float: left;
+    }
+
+    nav li button {
+        display: block;
+        color: white;
+        text-align: center;
+        margin-left: 1rem;
+        padding: 14px 16px;
+        text-decoration: none;
+    }
+
+    nav li button:focus {
+        outline: none;
+    }
+
+    .main-screen {
         /* make container all the screen */
         width: 100vw;
         height: 100vh;

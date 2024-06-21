@@ -10,14 +10,23 @@
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^3.0.2",
+    "monaco-editor-webpack-plugin": "^7.1.0",
     "svelte": "^4.2.12",
     "vite": "^5.2.0"
   },
   "dependencies": {
     "@brillout/vite-plugin-ssr": "^0.4.55",
+    "@codemirror/autocomplete": "^6.16.2",
+    "@codemirror/lang-javascript": "^6.2.2",
+    "@codemirror/legacy-modes": "github:codemirror/legacy-modes",
+    "@codemirror/theme-one-dark": "github:codemirror/theme-one-dark",
+    "codemirror": "^6.0.1",
+    "monaco-editor": "^0.49.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "svelte-codemirror-editor": "^1.4.0",
     "svelte-simple-modal": "^1.6.2",
+    "thememirror": "^2.0.1",
     "vite-plugin-ssr": "^0.4.142"
   }
 }

@@ -14,8 +14,13 @@ type Database interface {
     DeleteCollection(ctx context.Context, name string) error
     SaveCollectionChanges(ctx context.Context, new_collection types.Collection) error
 
-    GetQueryById(ctx context.Context, id int64) (string, error)
+    GetQuaries(ctx context.Context) ([]types.Query, error)
     GetQuaryById(ctx context.Context, query_id int64) (types.Query, error)
+    CreateQuery(ctx context.Context, name string) (types.Query, error)
+    UpdateQuaryById(ctx context.Context, query_id int64, query string) error
+    DeleteQuaryById(ctx context.Context, query_id int64) error
+    GetQueryRules(ctx context.Context, query_id int64) (string, error)
+    SetQueryRules(ctx context.Context, query_id int64, new_rules string) error
     RunQueryWithFilters(ctx context.Context, query types.Query, args map[string]any, filters string) ([]byte, error)
     RunQuery(query string, args map[string]any) ([]map[string]any, error)
     BasicCount(collection_name string, filter string, args []any) (int64, error)

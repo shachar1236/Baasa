@@ -28,7 +28,7 @@
     dialog {
         max-width: 32em;
         border-radius: 0.2em;
-        border: none;
+        border: solid 0.15em rgba(0, 0, 0, 0.5);
         padding: 0;
     }
     dialog::backdrop {

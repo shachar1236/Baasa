@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS table_fields (
 -- querys table
 CREATE TABLE IF NOT EXISTS queries (
     id   INTEGER PRIMARY KEY,
-    query text    NOT NULL,
-    query_rules_file_path text NOT NULL
+    name text UNIQUE NOT NULL,
+    query text    NOT NULL DEFAULT 'SELECT * FROM ?',
+    query_rules_file_path text NOT NULL GENERATED ALWAYS AS ("access_rules/rules/" || name || ".lua") STORED
 );
