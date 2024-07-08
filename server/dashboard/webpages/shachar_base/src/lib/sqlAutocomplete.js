@@ -45,6 +45,12 @@ export function createSqlAutocomplete(collections) {
         if (word.from === word.to && !context.explicit) return null;
 
         let options = [];
+        options = sqlKeywords
+            .filter((keyword) => keyword.toUpperCase())
+            .map((keyword) => ({
+                label: keyword,
+                type: "keyword",
+            }));
 
         console.log("collections: ", collections);
         console.log("word: ", word);
@@ -79,14 +85,6 @@ export function createSqlAutocomplete(collections) {
                         type: "table",
                     });
                 });
-            } else {
-                options = sqlKeywords
-                    .filter((keyword) =>
-                        keyword
-                            .toUpperCase()
-                            .startsWith(word.text.toUpperCase())
-                    )
-                    .map((keyword) => ({ label: keyword, type: "keyword" }));
             }
         }
 

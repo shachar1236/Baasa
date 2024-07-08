@@ -6,8 +6,6 @@
     export let query;
     export let collections;
 
-    let last_updated = Date.now();
-    let updated = false;
     let new_query = query;
 
     function changeQuery() {
@@ -25,16 +23,8 @@
 
     function onChange(value) {
         new_query = value;
-        last_updated = Date.now();
-        updated = false;
+        changeQuery();
     }
-
-    setInterval(() => {
-        if (Date.now() - last_updated > 1000 && !updated) {
-            updated = true;
-            changeQuery();
-        }
-    }, 1000);
 </script>
 
 <br />

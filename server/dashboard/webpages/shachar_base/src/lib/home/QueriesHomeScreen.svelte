@@ -120,7 +120,9 @@
                         {collections}
                     ></QueriesScreenEditQuery>
                 {:else if editScreen == "Rules"}
-                    <QueriesScreenEditRules query={$selected_query}
+                    <QueriesScreenEditRules
+                        query={$selected_query}
+                        {collections}
                     ></QueriesScreenEditRules>
                 {/if}
             {/if}
