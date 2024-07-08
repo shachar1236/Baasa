@@ -9,31 +9,33 @@
     let last_updated = Date.now();
     let updated = false;
 
-    let CustomKeywords = [
-        "Query",
-        "Count",
+    let CustomKeywords = {
+        Query: {},
+        Count: {},
 
-        "Request",
+        Request: {
+            Method: {},
+            Headers: {
+                Add: {},
+                Set: {},
+                Get: {},
+                Values: {},
+                Del: {},
+                Write: {},
+                Clone: {},
+            },
 
-        "Request.Method",
-        "Request.Method.Add",
-        "Request.Method.Set",
-        "Request.Method.Get",
-        "Request.Method.Values",
-        "Request.Method.Del",
-        "Request.Method.Write",
-        "Request.Method.Clone",
-        "Request.Method[]",
+            Auth: {
+                ID: {},
+                Username: {},
+                PasswordHash: {},
+                Session: {},
+            },
+        },
 
-        "Request.Auth",
-        "Request.Auth.ID",
-        "Request.Auth.Username",
-        "Request.Auth.PasswordHash",
-        "Request.Auth.Session",
-
-        "Filters",
-        "Accept",
-    ];
+        Filters: {},
+        Accept: {},
+    };
 
     fetch("/GetQueryRules?query_id=" + query.ID).then((response) => {
         response.json().then((data) => {

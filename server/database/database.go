@@ -10,6 +10,7 @@ type Database interface {
     GetCollectionByName(ctx context.Context, name string) (types.Collection, error)
     GetCollectionById(ctx context.Context, id int64) (types.Collection, error)
     GetCollections(ctx context.Context) ([]types.Collection, error)
+    GetBaseCollections() (collections_names []string , err error)
     AddCollection(ctx context.Context) (types.Collection, error)
     DeleteCollection(ctx context.Context, name string) error
     SaveCollectionChanges(ctx context.Context, new_collection types.Collection) error
@@ -24,6 +25,7 @@ type Database interface {
     RunQueryWithFilters(ctx context.Context, query types.Query, args map[string]any, filters string) ([]byte, error)
     RunQuery(query string, args map[string]any) ([]map[string]any, error)
     BasicCount(collection_name string, filter string, args []any) (int64, error)
+    Get(collection_name string, filters string, args []any) (map[string]any, error)
 
     ActionSetById(ctx context.Context, collection_name string, column_name string, id int64, to any) error
     ActionGetCollectionDataWithLimit(ctx context.Context, collection_name string, from int64, to int64) ([]map[string]any, error)

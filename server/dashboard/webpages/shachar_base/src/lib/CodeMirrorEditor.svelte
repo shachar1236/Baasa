@@ -11,14 +11,13 @@
 
     import { generateLuaAutocomplete } from "./luaAutocomplete.js";
     import { createSqlAutocomplete } from "./sqlAutocomplete.js";
-    import { createCustomWordsAutocomplete } from "./customWordsAutocomplete.js";
     import { dracula } from "thememirror";
 
     export let code = "";
     export let onChange = (value) => {};
     export let collections = [];
     export let lang = "lua";
-    export let CustomKeywords = [];
+    export let CustomKeywords = {};
 
     let my_extentions = [];
     if (lang == "lua") {

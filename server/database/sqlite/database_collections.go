@@ -112,6 +112,11 @@ func (this *SqliteDB) GetCollections(ctx context.Context) ([]types.Collection, e
 	return collections, err
 }
 
+func (this *SqliteDB) GetBaseCollections() (collections_names []string , err error) {
+    collections_names = []string{"users", "collections", "table_fields", "queries"}
+    return collections_names, nil
+}
+
 func (this *SqliteDB) AddCollection(ctx context.Context) (types.Collection, error) {
 	var collection types.Collection
 	name := "NewCollection_" + strconv.Itoa(rand.Int())

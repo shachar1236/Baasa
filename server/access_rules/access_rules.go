@@ -1,10 +1,13 @@
 package access_rules
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log/slog"
 	"os"
+	"strings"
+	"sync"
 
 	"github.com/shachar1236/Baasa/database"
 	lua "github.com/yuin/gopher-lua"
@@ -15,8 +18,8 @@ type AccessRules struct {
 	logger *slog.Logger
 	db     database.Database
 
-	databaseQuery lua.LGFunction
-	databaseCount lua.LGFunction 
+    main_lua_state *lua.LState
+    main_lua_state_mutex sync.Mutex
 }
 
 func New(db database.Database) AccessRules {
@@ -29,11 +32,45 @@ func New(db database.Database) AccessRules {
 	}
 	logger := slog.New(slog.NewTextHandler(mw, &slog.HandlerOptions{AddSource: true}))
 
+    // setting functions
+    L := lua.NewState()
+	L.SetGlobal("Query", L.NewFunction(getDatabaseQueryFunction(db, logger)))
+	L.SetGlobal("Count", L.NewFunction(getDatabaseCountFunction(db, logger)))
+	L.SetGlobal("Get", L.NewFunction(getDatabaseGetFunction(db, logger)))
+
+    base_string := `
+_name = {
+    count = function(filters, args) return Count("_name", filters, args) end,
+    get = function(filters, args) return Get("_name", filters, args) end,
+}`
+
+    base_collections, err := db.GetBaseCollections()
+    for _, collection := range base_collections {
+        code := strings.ReplaceAll(base_string, "_name", collection)
+        logger.Info("Running base access rules lua code: " + code)
+        err = L.DoString(code)
+        if err != nil {
+            logger.Error("Error in base access rules lua code: " + err.Error())
+        }
+    }
+
+    collections, err := db.GetCollections(context.Background())
+    if err != nil {
+        logger.Error("Error in base access rules lua code: " + err.Error())
+    } else {
+        for _, collection := range collections {
+            code := strings.ReplaceAll(base_string, "_name", collection.Name)
+            err = L.DoString(code)
+            if err != nil {
+                logger.Error("Error in base access rules lua code: " + err.Error())
+            }
+        }
+    }
+
 	return AccessRules{
 		logger: logger,
 		db:     db,
-        databaseQuery: getDatabaseQueryFunction(db, logger),
-        databaseCount: getDatabaseCountFunction(db, logger),
+        main_lua_state: L,
 	}
 }
 
@@ -57,7 +94,7 @@ func getDatabaseQueryFunction(db database.Database, logger *slog.Logger) lua.LGF
 	}
 }
 
-func  getDatabaseCountFunction(db database.Database, logger *slog.Logger) lua.LGFunction {
+func getDatabaseCountFunction(db database.Database, logger *slog.Logger) lua.LGFunction {
 	return func(L *lua.LState) int {
 		collection_name := L.ToString(1)
 		filters := L.ToString(2)
@@ -78,16 +115,36 @@ func  getDatabaseCountFunction(db database.Database, logger *slog.Logger) lua.LG
 	}
 }
 
+func getDatabaseGetFunction(db database.Database, logger *slog.Logger) lua.LGFunction {
+	return func(L *lua.LState) int {
+		collection_name := L.ToString(1)
+		filters := L.ToString(2)
+		args := L.ToTable(3)
+
+		var my_args []any
+		args.ForEach(func(l1, l2 lua.LValue) {
+			my_args = append(my_args, l2)
+		})
+
+		res, err := db.Get(collection_name, filters, my_args)
+		if err != nil {
+			logger.Info("Cant run get query from lua: ", err)
+		}
+
+		L.Push(luar.New(L, res))
+		return 1
+	}
+}
+
 func (this *AccessRules) CheckRules(rules_file_path string, filters *string, request Request) (bool, error) {
-	L := lua.NewState()
-	defer L.Close()
+    this.main_lua_state_mutex.Lock()
+    defer this.main_lua_state_mutex.Unlock()
+
+    L := this.main_lua_state
 
 	L.SetGlobal("Request", luar.New(L, request))
 	L.SetGlobal("Filters", lua.LString(""))
 	L.SetGlobal("Accept", lua.LFalse)
-
-	L.SetGlobal("Query", L.NewFunction(this.databaseQuery))
-	L.SetGlobal("Count", L.NewFunction(this.databaseCount))
 
 	if err := L.DoFile(rules_file_path); err != nil {
 		return false, err

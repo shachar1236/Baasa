@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"strings"
+    "github.com/leporo/sqlf"
 
 	"github.com/shachar1236/Baasa/database/sqlite/objects"
 	"github.com/shachar1236/Baasa/database/types"
@@ -192,6 +193,29 @@ func (this *SqliteDB) RunQuery(query string, args map[string]any) ([]map[string]
     }
 
     return results, nil
+}
+
+func (this *SqliteDB) Get(collection_name string, filters string, args []any) (map[string]any, error) {
+    query := sqlf.Select("*").From(collection_name).Where(filters).String() + " LIMIT 1;"
+    this.logger.Info("Running get query: " + query)
+    row, err := this.db.Queryx(query, args...)
+    if err != nil {
+        this.logger.Error("Cannot run query: " + err.Error())
+        return nil, err
+    }
+
+    for row.Next() {
+        res := make(map[string]interface{})
+        err = row.MapScan(res)
+        if err != nil {
+            this.logger.Error("Cannot run query: " + err.Error())
+            return nil, err
+        }
+        
+        return res, err
+    }
+
+    return nil, errors.New("Not Found")
 }
 
 func (this *SqliteDB) BasicCount(collection_name string, filters string, args []any) (int64, error) {
