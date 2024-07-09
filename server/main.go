@@ -16,7 +16,7 @@ func run(ctx context.Context, w io.Writer, args []string) error {
 
     err_channel := make(chan error)
     go dashboard.RunDashboard(ctx, err_channel, db)
-    api.RunApi(ctx, err_channel, db, access_rules)
+    api.RunApi(ctx, err_channel, db, &access_rules)
 
     return <-err_channel
 }

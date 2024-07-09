@@ -14,7 +14,7 @@ import (
 const portNum string = ":5050"
 
 
-func RunApi(ctx context.Context, err_channel chan error, db database.Database, access_rules access_rules.AccessRules) {
+func RunApi(ctx context.Context, err_channel chan error, db database.Database, access_rules *access_rules.AccessRules) {
 	mux := http.NewServeMux()
 
     logFile, err := os.OpenFile("logs/api.log", os.O_CREATE | os.O_APPEND | os.O_RDWR, 0666)

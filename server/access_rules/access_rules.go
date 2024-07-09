@@ -136,13 +136,14 @@ func getDatabaseGetFunction(db database.Database, logger *slog.Logger) lua.LGFun
 	}
 }
 
-func (this *AccessRules) CheckRules(rules_file_path string, filters *string, request Request) (bool, error) {
+func (this *AccessRules) CheckRules(rules_file_path string, filters *string, request Request, query_args map[string]any) (bool, error) {
     this.main_lua_state_mutex.Lock()
     defer this.main_lua_state_mutex.Unlock()
 
     L := this.main_lua_state
 
 	L.SetGlobal("Request", luar.New(L, request))
+	L.SetGlobal("Args", luar.New(L, query_args))
 	L.SetGlobal("Filters", lua.LString(""))
 	L.SetGlobal("Accept", lua.LFalse)
 

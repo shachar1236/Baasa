@@ -27,11 +27,12 @@
 Request struct {
     Method string,
     Headers http.Header,
-    Auth types.User,
+    Auth types.User
 }`,
         ],
         ["Request.Method", "string"],
-        ["Request.Headers", "map[string][]string"],
+        ["Request.Headers", "map[string]string"],
+        ["Request.Data", "map[string]string"],
 
         [
             "Request.Auth",
@@ -40,7 +41,7 @@ User struct {
 	ID           int64,
 	Username     string,
 	PasswordHash PasswordHash,
-	Session      string,
+	Session      string
 }
 `,
         ],
@@ -48,6 +49,8 @@ User struct {
         ["Request.Auth.Username", "string"],
         ["Request.Auth.PasswordHash", "PasswordHash"],
         ["Request.Auth.Session", "string"],
+
+        ["Args", "map[string]any - the arguments passed to the query"],
 
         [
             "Filters",
