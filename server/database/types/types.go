@@ -38,3 +38,39 @@ type User struct {
 	PasswordHash PasswordHash
 	Session      string
 }
+
+const (
+    TOKEN_VARIABLE_TYPE = iota
+    TOKEN_NUMBER_TYPE = iota
+    TOKEN_OPERATOR = iota
+    TOKEN_OPEN_PARENTHESIS = iota
+    TOKEN_CLOSE_PARENTHESIS = iota
+    TOKEN_EOF = iota
+)
+
+var filter_lang_operators = []string{
+    "==",
+    "!=",
+    ">",
+    ">=",
+    "<",
+    "<=",
+    "&&",
+    "||",
+    "~",
+    "!~",
+    ".",
+    "!.",
+    ">.",
+    ">=.",
+    "<.",
+    "<=.",
+    "~.",
+    "!~.",
+}
+
+type Token struct {
+    Value string
+    Type int 
+}
+

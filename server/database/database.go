@@ -15,6 +15,9 @@ type Database interface {
     DeleteCollection(ctx context.Context, name string) error
     SaveCollectionChanges(ctx context.Context, new_collection types.Collection) error
 
+    // build and runs user query
+    RunUserCustomQuery(collection_name string, fields []string, filter_tokens []types.Token, sort_by string, expand string, used_collections []types.Collection, used_collections_filters []string, ) (resJson string, err error)
+
     GetQuaries(ctx context.Context) ([]types.Query, error)
     GetQuaryById(ctx context.Context, query_id int64) (types.Query, error)
     CreateQuery(ctx context.Context, name string) (types.Query, error)
