@@ -39,7 +39,7 @@ func (q *Queries) ChangeFieldOptions(ctx context.Context, arg ChangeFieldOptions
 }
 
 const changeFieldToForeignKey = `-- name: ChangeFieldToForeignKey :exec
-UPDATE table_fields SET field_type = ?, is_foreign_key = true, fk_table_name = ?, fk_field_name = ? WHERE id = ?
+UPDATE table_fields SET is_foreign_key = true, field_type = ?, fk_table_name = ?, fk_field_name = ? WHERE id = ?
 `
 
 type ChangeFieldToForeignKeyParams struct {

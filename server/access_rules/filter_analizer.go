@@ -8,18 +8,22 @@ import (
 )
 
 // filter language:
-// you have the operators: ==, !=, >, >=, <, <=, &&, ||, ()
+// you have the operators: =, !=, >, >=, <, <=, &&, ||, ()
 // special operators:
 // '~' - sql like
-// '!~' - sql like reverse
+// '!~' - sql not like
 // '.' - contains / at least one equel
-// '!.' - at least one is not equel
-// '>.' - at least one is less
-// '>=.' - at least one is less or equel
-// '<.' - at least one is greater
-// '<=.' - at least one is greater or equel
-// '~.' - at least one is sql like
-// '!~.' - at least one is sql like reverse
+// '!.' - not contains
+// '>.' - all are less
+// '>=.' - all are less or equel
+// '<.' - all are greater
+// '<=.' - all are greater or equel
+// '!=.' - all are not equel
+// '.>' - at least one is less
+// '.>=' - at least one is less or equel
+// '.<' - at least one is greater
+// '.<=' - at least one is greater or equel
+// '.!=' - at least one is not equel
 
 const numbers = "0123456789."
 
@@ -175,6 +179,7 @@ func (this *AccessRules) analyzeVariableParts(my_collection_name string, token_a
 
 	token_as_variable.PartToCollection = make(map[string]types.Collection)
 	token_as_variable.PartToCollectionField = make(map[string]types.TableField)
+	token_as_variable.ExtandsToList = false
 
 	last_collection := my_collection
 	for i := 1; i < len(variable_parts)-1; i++ {
@@ -218,14 +223,14 @@ func (this *AccessRules) analyzeVariableParts(my_collection_name string, token_a
 					return
 				}
 
-				last_collection = curr_collection
-				used_collections.Add(curr_collection)
-				token_as_variable.PartToCollection[variable_parts[i]] = curr_collection
 				// checking if collection has relation to last collection
 				has_relation := false
+				var relation types.TableField
 				for _, field := range curr_collection.Fields {
-					if field.IsForeignKey && field.FkTableName.String == curr_collection.Name {
+					if field.IsForeignKey && field.FkTableName.String == last_collection.Name {
 						has_relation = true
+						relation = field
+						break
 					}
 				}
 
@@ -233,6 +238,18 @@ func (this *AccessRules) analyzeVariableParts(my_collection_name string, token_a
 					valid = false
 					return
 				}
+
+				last_collection = curr_collection
+				used_collections.Add(curr_collection)
+				token_as_variable.PartToCollection[variable_parts[i]] = curr_collection
+				// token_as_variable.PartToCollectionField[variable_parts[i]] = types.TableField{
+				// FkFieldName: types.NullString{
+				// Valid: true,
+				// String: relation.FieldName,
+				// },
+				// }
+				token_as_variable.PartToCollectionField[variable_parts[i]] = relation
+				token_as_variable.ExtandsToList = true
 			} else {
 				// its not a list
 				valid = false
@@ -258,7 +275,7 @@ func (this *AccessRules) AnalyzeUserFilter(my_collection_name string, filter str
 	}
 
 	used_collections.Init()
-    tokens = make([]types.Token, 0)
+	tokens = make([]types.Token, 0)
 
 	last_important_token := types.Token{
 		Type: types.TOKEN_EOF,
@@ -312,7 +329,7 @@ func (this *AccessRules) AnalyzeUserFilter(my_collection_name string, filter str
 					valid = false
 					return
 				}
-                curr_token.Value = token_as_variable
+				curr_token.Value = token_as_variable
 				used_collections.Union(added_used_collections)
 			} else if len(token_as_variable.Parts) == 2 {
 				// its a field from the collection
@@ -343,7 +360,7 @@ func (this *AccessRules) AnalyzeUserFilter(my_collection_name string, filter str
 			last_important_token = curr_token
 		}
 
-        tokens = append(tokens, curr_token)
+		tokens = append(tokens, curr_token)
 	}
 
 	return

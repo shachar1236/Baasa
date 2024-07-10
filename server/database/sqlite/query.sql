@@ -115,7 +115,7 @@ UPDATE table_fields SET field_type = ? WHERE id = ?;
 UPDATE table_fields SET field_options = ? WHERE id = ?;
 
 -- name: ChangeFieldToForeignKey :exec
-UPDATE table_fields SET field_type = ?, is_foreign_key = true, fk_table_name = ?, fk_field_name = ? WHERE id = ?;
+UPDATE table_fields SET is_foreign_key = true, field_type = ?, fk_table_name = ?, fk_field_name = ? WHERE id = ?;
 
 -- name: ChangeFieldToNotBeForeignKey :exec
 UPDATE table_fields SET is_foreign_key = false, fk_table_name = null, fk_field_name = null WHERE id = ?;

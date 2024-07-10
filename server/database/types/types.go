@@ -80,6 +80,7 @@ type TokenValueVariable struct {
     PartToCollection map[string]Collection
     PartToCollectionField map[string]TableField
     UsedCollectionsFilters map[string]string
+    ExtandsToList bool
 }
 
 func (value TokenValueVariable) GetType() int {

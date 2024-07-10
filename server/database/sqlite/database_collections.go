@@ -320,7 +320,7 @@ func (this *SqliteDB) SaveCollectionChanges(ctx context.Context, new_collection 
 						}
 
 						if is_new_field_fk {
-							logger.Info("Changing field " + new_field.FieldName + "to foreign key")
+                            logger.Info("Changing field " + new_field.FieldName + " to foreign key: " + new_field_fk_parts[0] + "." + new_field_fk_parts[1])
 							// change to fk
 							err = this.objects_queries.ChangeFieldToForeignKey(ctx, objects.ChangeFieldToForeignKeyParams{
 								FieldType: new_field.FieldType,
