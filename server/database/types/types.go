@@ -18,6 +18,9 @@ type TableField struct {
 	FieldName    string
 	FieldType    string
 	FieldOptions NullString
+	IsForeignKey bool
+	FkTableName  NullString
+	FkFieldName  NullString
 }
 
 type NullString struct {
@@ -39,17 +42,11 @@ type User struct {
 	Session      string
 }
 
-const (
-    TOKEN_VARIABLE_TYPE = iota
-    TOKEN_NUMBER_TYPE = iota
-    TOKEN_OPERATOR = iota
-    TOKEN_OPEN_PARENTHESIS = iota
-    TOKEN_CLOSE_PARENTHESIS = iota
-    TOKEN_EOF = iota
-)
+// ------------- token ----------------
 
-var filter_lang_operators = []string{
-    "==",
+
+var Filter_lang_operators = []string{
+    "=",
     "!=",
     ">",
     ">=",
@@ -69,8 +66,43 @@ var filter_lang_operators = []string{
     "!~.",
 }
 
+const (
+    TOKEN_VALUE_STRING_TYPE = iota
+    TOKEN_VALUE_VARIABLE_TYPE = iota
+)
+
+type TokenValue interface {
+    GetType() int
+}
+
+type TokenValueVariable struct {
+    Parts []string
+    PartToCollection map[string]Collection
+    PartToCollectionField map[string]TableField
+    UsedCollectionsFilters map[string]string
+}
+
+func (value TokenValueVariable) GetType() int {
+    return TOKEN_VALUE_VARIABLE_TYPE
+}
+
+type TokenValueString string
+
+func (value TokenValueString) GetType() int {
+    return TOKEN_VALUE_STRING_TYPE
+}
+const (
+    TOKEN_VARIABLE_TYPE = iota
+    TOKEN_NUMBER_TYPE = iota
+    TOKEN_STRING_TYPE = iota
+    TOKEN_OPERATOR = iota
+    TOKEN_OPEN_PARENTHESIS = iota
+    TOKEN_CLOSE_PARENTHESIS = iota
+    TOKEN_EOF = iota
+)
+
 type Token struct {
-    Value string
+    Value TokenValue
     Type int 
 }
 

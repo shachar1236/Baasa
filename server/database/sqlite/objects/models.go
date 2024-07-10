@@ -27,6 +27,9 @@ type TableField struct {
 	FieldName    string
 	FieldType    string
 	FieldOptions sql.NullString
+	IsForeignKey bool
+	FkTableName  sql.NullString
+	FkFieldName  sql.NullString
 }
 
 type User struct {

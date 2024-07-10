@@ -38,6 +38,36 @@ func (q *Queries) ChangeFieldOptions(ctx context.Context, arg ChangeFieldOptions
 	return err
 }
 
+const changeFieldToForeignKey = `-- name: ChangeFieldToForeignKey :exec
+UPDATE table_fields SET field_type = ?, is_foreign_key = true, fk_table_name = ?, fk_field_name = ? WHERE id = ?
+`
+
+type ChangeFieldToForeignKeyParams struct {
+	FieldType   string
+	FkTableName sql.NullString
+	FkFieldName sql.NullString
+	ID          int64
+}
+
+func (q *Queries) ChangeFieldToForeignKey(ctx context.Context, arg ChangeFieldToForeignKeyParams) error {
+	_, err := q.db.ExecContext(ctx, changeFieldToForeignKey,
+		arg.FieldType,
+		arg.FkTableName,
+		arg.FkFieldName,
+		arg.ID,
+	)
+	return err
+}
+
+const changeFieldToNotBeForeignKey = `-- name: ChangeFieldToNotBeForeignKey :exec
+UPDATE table_fields SET is_foreign_key = false, fk_table_name = null, fk_field_name = null WHERE id = ?
+`
+
+func (q *Queries) ChangeFieldToNotBeForeignKey(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, changeFieldToNotBeForeignKey, id)
+	return err
+}
+
 const changeFieldType = `-- name: ChangeFieldType :exec
 UPDATE table_fields SET field_type = ? WHERE id = ?
 `
@@ -110,8 +140,8 @@ func (q *Queries) CreateCollection(ctx context.Context, tableName string) (Colle
 }
 
 const createField = `-- name: CreateField :exec
-INSERT INTO table_fields (field_name, field_type, field_options, collection_id)
-VALUES (?, ?, ?, ?)
+INSERT INTO table_fields (field_name, field_type, field_options, collection_id, is_foreign_key, fk_table_name, fk_field_name)
+VALUES (?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateFieldParams struct {
@@ -119,6 +149,9 @@ type CreateFieldParams struct {
 	FieldType    string
 	FieldOptions sql.NullString
 	CollectionID int64
+	IsForeignKey bool
+	FkTableName  sql.NullString
+	FkFieldName  sql.NullString
 }
 
 func (q *Queries) CreateField(ctx context.Context, arg CreateFieldParams) error {
@@ -127,6 +160,9 @@ func (q *Queries) CreateField(ctx context.Context, arg CreateFieldParams) error 
 		arg.FieldType,
 		arg.FieldOptions,
 		arg.CollectionID,
+		arg.IsForeignKey,
+		arg.FkTableName,
+		arg.FkFieldName,
 	)
 	return err
 }
@@ -200,7 +236,10 @@ SELECT collections.id AS collection_id,
        table_fields.id AS field_id, 
        table_fields.field_name, 
        table_fields.field_type, 
-       table_fields.field_options
+       table_fields.field_options,
+       table_fields.is_foreign_key,
+       table_fields.fk_table_name,
+       table_fields.fk_field_name
 FROM collections 
 LEFT JOIN table_fields ON collections.id = table_fields.collection_id
 `
@@ -213,6 +252,9 @@ type GetAllTablesAndFieldsRow struct {
 	FieldName               sql.NullString
 	FieldType               sql.NullString
 	FieldOptions            sql.NullString
+	IsForeignKey            sql.NullBool
+	FkTableName             sql.NullString
+	FkFieldName             sql.NullString
 }
 
 func (q *Queries) GetAllTablesAndFields(ctx context.Context) ([]GetAllTablesAndFieldsRow, error) {
@@ -232,6 +274,9 @@ func (q *Queries) GetAllTablesAndFields(ctx context.Context) ([]GetAllTablesAndF
 			&i.FieldName,
 			&i.FieldType,
 			&i.FieldOptions,
+			&i.IsForeignKey,
+			&i.FkTableName,
+			&i.FkFieldName,
 		); err != nil {
 			return nil, err
 		}
@@ -319,7 +364,10 @@ SELECT collections.id AS collection_id,
     table_fields.id AS field_id,
     table_fields.field_name,
     table_fields.field_type,
-    table_fields.field_options
+    table_fields.field_options,
+    table_fields.is_foreign_key,
+    table_fields.fk_table_name,
+    table_fields.fk_field_name
 FROM collections
     LEFT JOIN table_fields ON collections.id = table_fields.collection_id
 WHERE collections.id = ?
@@ -333,6 +381,9 @@ type GetTableAndFieldsByTableIdRow struct {
 	FieldName               sql.NullString
 	FieldType               sql.NullString
 	FieldOptions            sql.NullString
+	IsForeignKey            sql.NullBool
+	FkTableName             sql.NullString
+	FkFieldName             sql.NullString
 }
 
 func (q *Queries) GetTableAndFieldsByTableId(ctx context.Context, id int64) ([]GetTableAndFieldsByTableIdRow, error) {
@@ -352,6 +403,9 @@ func (q *Queries) GetTableAndFieldsByTableId(ctx context.Context, id int64) ([]G
 			&i.FieldName,
 			&i.FieldType,
 			&i.FieldOptions,
+			&i.IsForeignKey,
+			&i.FkTableName,
+			&i.FkFieldName,
 		); err != nil {
 			return nil, err
 		}
@@ -373,7 +427,10 @@ SELECT collections.id AS collection_id,
     table_fields.id AS field_id,
     table_fields.field_name,
     table_fields.field_type,
-    table_fields.field_options
+    table_fields.field_options,
+    table_fields.is_foreign_key,
+    table_fields.fk_table_name,
+    table_fields.fk_field_name
 FROM collections
     LEFT JOIN table_fields ON collections.id = table_fields.collection_id WHERE collections.table_name = ?
 `
@@ -386,6 +443,9 @@ type GetTableAndFieldsByTableNameRow struct {
 	FieldName               sql.NullString
 	FieldType               sql.NullString
 	FieldOptions            sql.NullString
+	IsForeignKey            sql.NullBool
+	FkTableName             sql.NullString
+	FkFieldName             sql.NullString
 }
 
 func (q *Queries) GetTableAndFieldsByTableName(ctx context.Context, tableName string) ([]GetTableAndFieldsByTableNameRow, error) {
@@ -405,6 +465,9 @@ func (q *Queries) GetTableAndFieldsByTableName(ctx context.Context, tableName st
 			&i.FieldName,
 			&i.FieldType,
 			&i.FieldOptions,
+			&i.IsForeignKey,
+			&i.FkTableName,
+			&i.FkFieldName,
 		); err != nil {
 			return nil, err
 		}

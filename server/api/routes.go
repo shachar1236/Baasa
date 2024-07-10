@@ -3,6 +3,7 @@ package api
 import (
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/shachar1236/Baasa/access_rules"
 	"github.com/shachar1236/Baasa/database"
@@ -13,10 +14,14 @@ const SEARCH_RULES_FILENAME = "search.lua"
 
 func addRoutes(mux *http.ServeMux, logger *slog.Logger, db database.Database, access_rules *access_rules.AccessRules) {
 	mux.Handle("/query", handleQuery(logger, db, access_rules))
+	mux.Handle("/collection/search", handleCollectionSearch(logger, db, access_rules))
 	mux.Handle("/", http.NotFoundHandler())
 }
 
 func createRequestObject(r *http.Request, user types.User) (access_rules.Request, error) {
+    if user.ID == -1 {
+        return access_rules.Request{}, nil
+    }
     request := access_rules.Request{
         Method:  r.Method,
         Auth:    user,
@@ -108,6 +113,7 @@ func handleCollectionSearch(logger *slog.Logger, db database.Database, ar *acces
     type SearchMessage struct {
         CollectionName string `json:"CollectionName"`
         Session string `json:"Session"`
+        Fields []string `json:"Fields"`
         Filter string `json:"Filter"`
         SortBy string `json:"SortBy"`
         Expand string `json:"Expand"`
@@ -147,34 +153,38 @@ func handleCollectionSearch(logger *slog.Logger, db database.Database, ar *acces
             
             var query_filters string
 
-			accept, err := ar.CheckRules(collection.QueryRulesDirectoryPath + SEARCH_RULES_FILENAME, &query_filters, request, nil)
+            // logger.Info("Collection rules: " + collection.QueryRulesDirectoryPath + SEARCH_RULES_FILENAME)
+            file_path := "access_rules/rules/" + strconv.FormatInt(collection.ID, 10) + "/" + SEARCH_RULES_FILENAME
+			accept, err := ar.CheckRules(file_path, &query_filters, request, nil)
 			if err != nil {
-				logger.Error("Cannot check query rules: ", err)
+				logger.Error("Cannot check query rules: " + err.Error())
 				http.Error(w, "An error occured", http.StatusInternalServerError)
 				return
 			}
 
 			if accept {
+                logger.Info("Access rules accepted")
                 // analizing the filter
-                used_collections, isValid := db.AnalyzeUserFilter(msg.Filter)
+                _, isValid, tokens := ar.AnalyzeUserFilter(msg.CollectionName, msg.Filter)
                 if isValid {
-                    used_collections_filters := make([]string, len(used_collections))
+                    logger.Info("Filter is valid")
+                    // used_collections_filters := make([]string, len(used_collections))
                     // checking used collections access rules
-                    for i, used_collection := range used_collections {
-                        accept, err := ar.CheckRules(used_collection.QueryRulesDirectoryPath + SEARCH_RULES_FILENAME, &(used_collections_filters[i]), request, nil)
-                        if err != nil {
-                            logger.Error("Cannot check query rules: ", err)
-                            http.Error(w, "An error occured", http.StatusInternalServerError)
-                            return
-                        }
-                        if !accept {
-                            http.Error(w, "Do not have access to collection " + used_collection.Name, http.StatusNotFound)
-                            return
-                        }
-                    }
+                    // for i, used_collection := range used_collections {
+                        // accept, err := ar.CheckRules(used_collection.QueryRulesDirectoryPath + SEARCH_RULES_FILENAME, &(used_collections_filters[i]), request, nil)
+                        // if err != nil {
+                            // logger.Error("Cannot check query rules: ", err)
+                            // http.Error(w, "An error occured", http.StatusInternalServerError)
+                            // return
+                        // }
+                        // if !accept {
+                            // http.Error(w, "Do not have access to collection " + used_collection.Name, http.StatusNotFound)
+                            // return
+                        // }
+                    // }
 
                     // running query
-                    resJson ,err := db.RunUserCustomQuery(msg.CollectionName, msg.Filter, msg.SortBy, msg.Expand, used_collections, used_collections_filters)
+                    db.RunUserCustomQuery(msg.CollectionName, msg.Fields, tokens, msg.SortBy, msg.Expand, nil)
                 }
 			}
         },
