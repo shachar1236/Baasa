@@ -165,26 +165,30 @@ func handleCollectionSearch(logger *slog.Logger, db database.Database, ar *acces
 			if accept {
                 logger.Info("Access rules accepted")
                 // analizing the filter
-                _, isValid, tokens := ar.AnalyzeUserFilter(msg.CollectionName, msg.Filter)
+                used_collections, isValid, tokens := ar.AnalyzeUserFilter(msg.CollectionName, msg.Filter)
                 if isValid {
                     logger.Info("Filter is valid")
-                    // used_collections_filters := make([]string, len(used_collections))
+                    used_collections_filters := make(map[string]string)
                     // checking used collections access rules
-                    // for i, used_collection := range used_collections {
-                        // accept, err := ar.CheckRules(used_collection.QueryRulesDirectoryPath + SEARCH_RULES_FILENAME, &(used_collections_filters[i]), request, nil)
-                        // if err != nil {
-                            // logger.Error("Cannot check query rules: ", err)
-                            // http.Error(w, "An error occured", http.StatusInternalServerError)
-                            // return
-                        // }
-                        // if !accept {
-                            // http.Error(w, "Do not have access to collection " + used_collection.Name, http.StatusNotFound)
-                            // return
-                        // }
-                    // }
+                    for collection_name, used_collection := range used_collections.GetMap() {
+                        file_path := "access_rules/rules/" + strconv.FormatInt(used_collection.ID, 10) + "/" + SEARCH_RULES_FILENAME
+                        var filters string
+                        accept, err := ar.CheckRules(file_path, &filters, request, nil)
+                        if err != nil {
+                            logger.Error("Cannot check query rules: ", err)
+                            http.Error(w, "An error occured", http.StatusInternalServerError)
+                            return
+                        }
+                        if !accept {
+                            http.Error(w, "Do not have access to collection " + used_collection.Name, http.StatusNotFound)
+                            return
+                        }
+
+                        used_collections_filters[collection_name] = filters
+                    }
 
                     // running query
-                    db.RunUserCustomQuery(msg.CollectionName, msg.Fields, tokens, msg.SortBy, msg.Expand, nil)
+                    db.RunUserCustomQuery(msg.CollectionName, msg.Fields, tokens, msg.SortBy, msg.Expand, used_collections_filters)
                 }
 			}
         },

@@ -19,7 +19,7 @@ func (db *SqliteDB) RunUserCustomQuery(
     filter_tokens []types.Token,
     sort_by string,
     expand string,
-    used_collections_filters []string,
+    used_collections_filters map[string]string, // map[collection_name]filters
 ) (resJson string, err error) {
     _ = sqlf.Select(strings.Join(fields, ",")).From(collection_name)
 
@@ -37,7 +37,7 @@ func (db *SqliteDB) RunUserCustomQuery(
             variable_parts := token_as_variable.Parts
             if len(variable_parts) > 2 {
                 // its nested collections
-                createExpandedSelect(&token_as_variable, &sb)
+                createExpandedSelect(&token_as_variable, &sb, used_collections_filters)
             } else if len(variable_parts) == 2 {
                 // its a field from the collection
                 sb.WriteString(token_as_variable.Parts[0] + "." + token_as_variable.Parts[1])
@@ -61,7 +61,7 @@ func (db *SqliteDB) RunUserCustomQuery(
     return
 }
 
-func createExpandedSelect(token_as_variable *types.TokenValueVariable, sb *strings.Builder) {
+func createExpandedSelect(token_as_variable *types.TokenValueVariable, sb *strings.Builder, used_collections_filters map[string]string) {
     // TODO: add collection filters
     variable_parts := token_as_variable.Parts
     last_index := len(variable_parts) - 1
@@ -72,8 +72,15 @@ func createExpandedSelect(token_as_variable *types.TokenValueVariable, sb *strin
         sb.WriteString(" (SELECT ")
         sb.WriteString(variable_parts[i])
         sb.WriteString(" FROM ")
-        sb.WriteString(token_as_variable.PartToCollection[variable_parts[i - 1]].Name)
+        curr_used_collection := token_as_variable.PartToCollection[variable_parts[i - 1]].Name
+        sb.WriteString(curr_used_collection)
         sb.WriteString(" WHERE ")
+        filters := used_collections_filters[curr_used_collection]
+        if filters != "" {
+            sb.WriteString("(")
+            sb.WriteString(filters)
+            sb.WriteString(") AND ")
+        }
         sb.WriteString(token_as_variable.PartToCollectionField[variable_parts[i - 1]].FkFieldName.String)
         sb.WriteString(" = ")
     }
