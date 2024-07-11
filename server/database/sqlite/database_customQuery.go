@@ -38,53 +38,53 @@ func (db *SqliteDB) BuildUserCustomQuery(
 			case "||":
 				sb.WriteString(" OR ")
 				break
-            case "~":
-                sb.WriteString(" LIKE ")
-                break
+			case "~":
+				sb.WriteString(" LIKE ")
+				break
 			case "!~":
 				sb.WriteString(" NOT LIKE ")
-                break
-            case ".":
-                sb.WriteString(" IN ")
-                break
-            case "!.":
-                sb.WriteString(" NOT IN ")
-                break
-            case ">.":
-                sb.WriteString(" > ALL ")
-                break
-            case ">=.":
-                sb.WriteString(" >= ALL ")
-                break
-            case "<.":
-                sb.WriteString(" < ALL ")
-                break
-            case "<=.":
-                sb.WriteString(" <= ALL ")
-                break
-            case "!=.":
-                sb.WriteString(" != ALL ")
-                break
-            case ".>":
-                sb.WriteString(" > ANY ")
-                break
-            case ".>=":
-                sb.WriteString(" >= ANY ")
-                break
-            case ".<":
-                sb.WriteString(" < ANY ")
-                break
-            case ".<=":
-                sb.WriteString(" <= ANY ")
-                break
-            case ".!=":
-                sb.WriteString(" != ANY ")
-                break
-            default:
-                sb.WriteString(" ")
-                sb.WriteString(string(token_as_string))
-                sb.WriteString(" ")
-                break
+				break
+			case ".":
+				sb.WriteString(" IN ")
+				break
+			case "!.":
+				sb.WriteString(" NOT IN ")
+				break
+			case ">.":
+				sb.WriteString(" > ALL ")
+				break
+			case ">=.":
+				sb.WriteString(" >= ALL ")
+				break
+			case "<.":
+				sb.WriteString(" < ALL ")
+				break
+			case "<=.":
+				sb.WriteString(" <= ALL ")
+				break
+			case "!=.":
+				sb.WriteString(" != ALL ")
+				break
+			case ".>":
+				sb.WriteString(" > ANY ")
+				break
+			case ".>=":
+				sb.WriteString(" >= ANY ")
+				break
+			case ".<":
+				sb.WriteString(" < ANY ")
+				break
+			case ".<=":
+				sb.WriteString(" <= ANY ")
+				break
+			case ".!=":
+				sb.WriteString(" != ANY ")
+				break
+			default:
+				sb.WriteString(" ")
+				sb.WriteString(string(token_as_string))
+				sb.WriteString(" ")
+				break
 			}
 		} else if token.Type == types.TOKEN_VARIABLE_TYPE {
 			token_as_variable := token.Value.(types.TokenValueVariable)
@@ -136,61 +136,88 @@ func (db *SqliteDB) RunUserCustomQuery(
 }
 
 func createExpandedSelect(token_as_variable *types.TokenValueVariable, sb *strings.Builder, used_collections_filters map[string]string) {
-	variable_parts := token_as_variable.Parts
-	last_index := len(variable_parts) - 1
-	// sb.WriteString("(SELECT ")
-	// sb.WriteString(variable_parts[last_index])
-	// sb.WriteString(" FROM ")
-	for i := last_index; i > 1; i-- {
-		sb.WriteString(" (SELECT ")
-        field_name := variable_parts[i]
-        if token_as_variable.ExtandsToList && i == last_index - 1 {
-            field_name = token_as_variable.PartToCollectionField[variable_parts[i-1]].FkFieldName.String
-        }
+	last_index := len(token_as_variable.Fields) - 1
+
+	curr_field := token_as_variable.Fields[last_index]
+	sb.WriteString("(SELECT ")
+	sb.WriteString(curr_field.FieldName)
+	sb.WriteString(" FROM ")
+	sb.WriteString(curr_field.FieldTable)
+	sb.WriteString(" WHERE ")
+	for i := last_index - 1; i > 0; i-- {
+		curr_field = token_as_variable.Fields[i]
+		field_name := curr_field.FieldName
+		field_table := curr_field.FieldTable
+		relation_field := "id"
+		// if curr_field.ViaChildToParent {
+			// relation_field = field_name
+			// field_name = "id"
+		// }
+		sb.WriteString(relation_field)
+		sb.WriteString(" = (SELECT ")
 		sb.WriteString(field_name)
 		sb.WriteString(" FROM ")
-		curr_used_collection := token_as_variable.PartToCollection[variable_parts[i-1]].Name
-		sb.WriteString(curr_used_collection)
+		sb.WriteString(field_table)
 		sb.WriteString(" WHERE ")
-		filters := used_collections_filters[curr_used_collection]
-		if filters != "" {
-			sb.WriteString("(")
-			sb.WriteString(filters)
-			sb.WriteString(") AND ")
+	}
+
+	curr_field = token_as_variable.Fields[0]
+	sb.WriteString(token_as_variable.LastFieldRefersToField)
+	sb.WriteString(" = ")
+	sb.WriteString(curr_field.FieldName)
+
+	for i := 0; i < last_index; i++ {
+		curr_field = token_as_variable.Fields[i]
+		if !curr_field.ViaChildToParent {
+			sb.WriteString(" LIMIT 1)")
+		} else {
+			sb.WriteString(")")
 		}
-        fk_variable := token_as_variable.PartToCollectionField[variable_parts[i-1]].FkFieldName.String
-        if token_as_variable.ExtandsToList && i == last_index {
-            fk_variable = token_as_variable.PartToCollectionField[variable_parts[i-1]].FieldName
-        }
-		sb.WriteString(fk_variable)
-		sb.WriteString(" = ")
 	}
-	sb.WriteString(variable_parts[0])
-	sb.WriteString(".")
-	sb.WriteString(variable_parts[1])
-	for i := last_index; i > 1; i-- {
-        sb.WriteString(" LIMIT 1)")
-	}
+
 }
 
 // posts.user.father.mentor.name = "shachar"
-// SELECT name FROM (SELECT name FROM mentors WHERE id = (SELECT mentor FROM fathers WHERE id = (SELECT father FROM users WHERE id = posts.user)))
+// (SELECT name FROM mentors WHERE id = (SELECT mentor FROM fathers WHERE id = (SELECT father FROM users WHERE id = posts.user))
+// { "field_name": "posts.user", "table": "posts",  "field_foreign_key_to": ""}
+
+// { "field_name": "father", "table": "users",  "field_foreign_key_to": ["fathers", "id"]}
+// { "field_name": "mentor", "table": "fathers",  "field_foreign_key_to": ["mentors", "id"]}
+
+// { "field_name": "name", "table": "mentors",  "field_foreign_key_to": ""}
 
 // posts.user.mentor.name = "shachar"
 // (SELECT name FROM mentors WHERE id = (SELECT mentor FROM users WHERE id = posts.user)) == "shachar"
+// fields =
 
 // --->
 // posts.user.name == 'shachar'
-// (SELECT name FROM (SELECT name FROM users WHERE id = posts.user)) == 'shachar'
 // (SELECT name FROM users WHERE id = posts.user) == 'shachar'
+// fields =
+// { "field_name": "Posts.user", "table": "Posts",  "field_foreign_key_to": []}
+// { "field_name": "name", "table": "users",  "field_foreign_key_to": []}
 
-// 'test' . Posts.user.title.Posts - no!!!!!!!!!!!!!! 
-// 'test' . Posts.user.Posts.title
-// 'test' IN (SELECT title FROM Posts WHERE user = (SELECT id FROM Users WHERE id = Posts.user))
-
-// <------
 // 'test' . Posts.user.Comments.content
 // 'test' IN (SELECT content FROM Comments WHERE created_by_user = (SELECT id FROM users WHERE name = Posts.user))
+// fields =
+// { "field_name": "Posts.user", "table": "Posts",  "field_foreign_key_to": []}
+
+// { "field_name": "id", "table": "users",  "field_foreign_key_refers_to": ["Comments", "created_by_user"]} ||
+//      { "field_name": "created_by_user", "table": "Comments", via_child_to_parent = true,  "field_foreign_key_refers_to": ["Users", "id"]}
+
+// { "field_name": "content", "table": "Comments",  "field_foreign_key_to": ""}
+
+// ------------
+// { "field_name": "Posts.user", "table": "Posts",  "field_foreign_key_to": []}
+// { "field_name": "content", "table": "Comments",  "field_foreign_key_to": ""}
 
 // 'test' . Posts.user.mentor.Posts.title
-// 'test' IN (SELECT title FROM Posts WHERE user = (SELECT mentor FROM Users WHERE id = (SELECT id FROM users WHERE name = Posts.user))
+// 'test' IN (SELECT title FROM Posts WHERE user = (SELECT mentor FROM Users WHERE id = Posts.user))
+// { "field_name": "Posts.user", "table": "Posts",  "field_foreign_key_to": ""}
+// { "field_name": "mentor", "table": "Users",  "field_foreign_key_to": "mentors"}
+// { "field_name": "title", "table": "Posts",  "field_foreign_key_to": ""}
+
+
+// Posts.user
+// { "field_name": "mentor", "table": "Users",  "field_foreign_key_to": "id"}
+// { "field_name": "title", "table": "Posts",  "field_foreign_key_to": "user"}

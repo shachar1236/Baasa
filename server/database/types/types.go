@@ -13,14 +13,13 @@ type Collection struct {
 }
 
 type TableField struct {
-	ID           int64
-	CollectionID int64
-	FieldName    string
-	FieldType    string
-	FieldOptions NullString
-	IsForeignKey bool
-	FkTableName  NullString
-	FkFieldName  NullString
+	ID              int64
+	CollectionID    int64
+	FieldName       string
+	FieldType       string
+	FieldOptions    NullString
+	IsForeignKey    bool
+	FkRefersToTable NullString
 }
 
 type NullString struct {
@@ -75,12 +74,25 @@ type TokenValue interface {
     GetType() int
 }
 
+// type TokenValueVariable struct {
+    // Parts []string
+    // PartToCollection map[string]Collection
+    // PartToCollectionField map[string]TableField
+    // UsedCollectionsFilters map[string]string
+    // ExtandsToList bool
+// }
+
+type TokenValueVariableFields struct {
+    FieldName string
+    FieldTable string
+    FieldForeignKeyRefersToTable string
+    ViaChildToParent bool `default:false`
+}
+
 type TokenValueVariable struct {
     Parts []string
-    PartToCollection map[string]Collection
-    PartToCollectionField map[string]TableField
-    UsedCollectionsFilters map[string]string
-    ExtandsToList bool
+    Fields []TokenValueVariableFields
+    LastFieldRefersToField string
 }
 
 func (value TokenValueVariable) GetType() int {

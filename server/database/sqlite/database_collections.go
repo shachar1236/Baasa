@@ -35,8 +35,7 @@ func (this *SqliteDB) GetCollectionByName(ctx context.Context, name string) (typ
 					FieldType:    coll.FieldType.String,
 					FieldOptions: types.NullString(coll.FieldOptions),
                     IsForeignKey: coll.IsForeignKey.Bool,
-                    FkTableName: types.NullString(coll.FkTableName),
-                    FkFieldName: types.NullString(coll.FkFieldName),
+                    FkRefersToTable: types.NullString(coll.FkRefersToTable),
 				}
 				collection.Fields = append(collection.Fields, field)
 			}
@@ -70,8 +69,7 @@ func (this *SqliteDB) GetCollectionById(ctx context.Context, id int64) (types.Co
 					FieldType:    coll.FieldType.String,
 					FieldOptions: types.NullString(coll.FieldOptions),
                     IsForeignKey: coll.IsForeignKey.Bool,
-                    FkTableName: types.NullString(coll.FkTableName),
-                    FkFieldName: types.NullString(coll.FkFieldName),
+                    FkRefersToTable: types.NullString(coll.FkRefersToTable),
 				}
 				collection.Fields = append(collection.Fields, field)
 			}
@@ -175,13 +173,11 @@ func (this *SqliteDB) DeleteCollection(ctx context.Context, name string) error {
 }
 
 // fk = key(table.field, contsrains)
-func getTableFieldAndConstrainsFromFK(fk string) (table_relation_name string, table_field_relation_name string, constraints string) {
+func getTableFieldAndConstrainsFromFK(fk string) (table_relation_name string, constraints string) {
 	t := fk[4 : len(fk)-1]
 	params := strings.Split(t, ",")
 	if len(params) > 0 {
-		relation_params := strings.Split(params[0], ".")
-		table_relation_name = relation_params[0]
-		table_field_relation_name = relation_params[1]
+		table_relation_name = params[0]
 		if len(params) == 2 {
 			constraints = params[1]
 		} else {
@@ -218,15 +214,13 @@ func getAddTableQueryForCollection(ctx context.Context, collection types.Collect
 	}
 
 	for _, fk := range fks {
-		table_relation_name, table_field_relation_name, constraints := getTableFieldAndConstrainsFromFK(fk.FieldType)
+		table_relation_name, constraints := getTableFieldAndConstrainsFromFK(fk.FieldType)
 
 		sb.WriteString("FOREIGN KEY(") // collections(id) ON DELETE CASCADE")
 		sb.WriteString(fk.FieldName)
 		sb.WriteString(") REFERENCES ")
 		sb.WriteString(table_relation_name)
-		sb.WriteString("(")
-		sb.WriteString(table_field_relation_name)
-		sb.WriteString(") ")
+		sb.WriteString("(id)")
 
 		// writing contsrains
 		sb.WriteString(constraints)
@@ -235,19 +229,18 @@ func getAddTableQueryForCollection(ctx context.Context, collection types.Collect
 
 	// sb.WriteString(");")
 	q := sb.String()
-	q = q[:len(q)-2]
+	q = q[:len(q)-1]
 
 	return q + ");"
 }
 
-func analyze_if_fk(field_type string) (is_fk bool, parts [2]string) {
+func analyze_if_fk(field_type string) (is_fk bool, fk_refers_to_table string) {
 	if len(field_type) > 6 {
 		if field_type[:3] == "key" {
 			// inside := filed_type[3:len(filed_type) - 1]
 			// p := strings.Split(inside, ".")
-			t, f, _ := getTableFieldAndConstrainsFromFK(field_type)
-			parts[0] = t
-			parts[1] = f
+			t, _ := getTableFieldAndConstrainsFromFK(field_type)
+            fk_refers_to_table = t
 			is_fk = true
 			return
 		}
@@ -306,7 +299,7 @@ func (this *SqliteDB) SaveCollectionChanges(ctx context.Context, new_collection 
 					needs_to_create_new = true
 					needs_to_copy = true
 
-					is_new_field_fk, new_field_fk_parts := analyze_if_fk(new_field.FieldType)
+					is_new_field_fk, new_field_fk_refers_to := analyze_if_fk(new_field.FieldType)
 					is_old_field_fk, _ := analyze_if_fk(old_field.FieldType)
 
 					if_succeds = append(if_succeds, func() {
@@ -320,15 +313,11 @@ func (this *SqliteDB) SaveCollectionChanges(ctx context.Context, new_collection 
 						}
 
 						if is_new_field_fk {
-                            logger.Info("Changing field " + new_field.FieldName + " to foreign key: " + new_field_fk_parts[0] + "." + new_field_fk_parts[1])
 							// change to fk
 							err = this.objects_queries.ChangeFieldToForeignKey(ctx, objects.ChangeFieldToForeignKeyParams{
 								FieldType: new_field.FieldType,
-								FkTableName: sql.NullString{
-									String: new_field_fk_parts[0],
-								},
-								FkFieldName: sql.NullString{
-									String: new_field_fk_parts[1],
+								FkRefersToTable: sql.NullString{
+									String: new_field_fk_refers_to,
 								},
 								ID: old_field.ID,
 							})
@@ -384,7 +373,7 @@ func (this *SqliteDB) SaveCollectionChanges(ctx context.Context, new_collection 
 			needs_to_create_new = true
 			needs_to_copy = true
 
-            is_new_field_fk, new_field_fk_parts := analyze_if_fk(new_field.FieldType)
+            is_new_field_fk, new_field_fk_refers_to := analyze_if_fk(new_field.FieldType)
 
 			if_succeds = append(if_succeds, func() {
                 params := objects.CreateFieldParams{
@@ -395,15 +384,11 @@ func (this *SqliteDB) SaveCollectionChanges(ctx context.Context, new_collection 
                     IsForeignKey: is_new_field_fk,
 				}
                 if is_new_field_fk {
-                    params.FkTableName = sql.NullString{
-                        String: new_field_fk_parts[0],
+                    params.FkRefersToTable = sql.NullString{
+                        String: new_field_fk_refers_to,
                         Valid: true,
                     }
 
-                    params.FkFieldName = sql.NullString{
-                        String: new_field_fk_parts[1],
-                        Valid: true,
-                    }
                 }
 				err := this.objects_queries.CreateField(ctx, params)
 

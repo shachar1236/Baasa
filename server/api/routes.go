@@ -132,7 +132,7 @@ func handleCollectionSearch(logger *slog.Logger, db database.Database, ar *acces
             collection, err := db.GetCollectionByName(r.Context(), msg.CollectionName)
             if err != nil {
                 logger.Error("Cannot get collection: " + err.Error())
-                http.Error(w, err.Error(), http.StatusInternalServerError)
+                http.Error(w, "", http.StatusInternalServerError)
                 return
             }
 

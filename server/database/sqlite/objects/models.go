@@ -22,14 +22,13 @@ type Query struct {
 }
 
 type TableField struct {
-	ID           int64
-	CollectionID int64
-	FieldName    string
-	FieldType    string
-	FieldOptions sql.NullString
-	IsForeignKey bool
-	FkTableName  sql.NullString
-	FkFieldName  sql.NullString
+	ID              int64
+	CollectionID    int64
+	FieldName       string
+	FieldType       string
+	FieldOptions    sql.NullString
+	IsForeignKey    bool
+	FkRefersToTable sql.NullString
 }
 
 type User struct {

@@ -177,9 +177,14 @@ func (this *AccessRules) analyzeVariableParts(my_collection_name string, token_a
 		return
 	}
 
-	token_as_variable.PartToCollection = make(map[string]types.Collection)
-	token_as_variable.PartToCollectionField = make(map[string]types.TableField)
-	token_as_variable.ExtandsToList = false
+	token_as_variable.Fields = make([]types.TokenValueVariableFields, len(variable_parts)-1)
+    token_as_variable.LastFieldRefersToField = "id"
+
+	token_as_variable.Fields[0] = types.TokenValueVariableFields{
+		FieldName:        variable_parts[0] + "." + variable_parts[1],
+		FieldTable:       variable_parts[0],
+		ViaChildToParent: false,
+	}
 
 	last_collection := my_collection
 	for i := 1; i < len(variable_parts)-1; i++ {
@@ -195,10 +200,15 @@ func (this *AccessRules) analyzeVariableParts(my_collection_name string, token_a
 
 		if my_field.ID != -1 {
 
-			token_as_variable.PartToCollectionField[variable_parts[i]] = my_field
+            if i != 1 {
+                token_as_variable.Fields[i - 1].FieldName = variable_parts[i]
+                token_as_variable.Fields[i - 1].FieldTable = last_collection.Name
+                token_as_variable.Fields[i - 1].FieldForeignKeyRefersToTable = my_field.FkRefersToTable.String
+                token_as_variable.Fields[i - 1].ViaChildToParent = false
+            }
 
 			if my_field.IsForeignKey {
-				curr_collection_name := my_field.FkTableName.String
+				curr_collection_name := my_field.FkRefersToTable.String
 				curr_collection, err := this.db.GetCollectionByName(context.Background(), curr_collection_name)
 				if err != nil {
 					valid = false
@@ -206,9 +216,8 @@ func (this *AccessRules) analyzeVariableParts(my_collection_name string, token_a
 					return
 				}
 
-				used_collections.Add(curr_collection)
-				token_as_variable.PartToCollection[variable_parts[i]] = curr_collection
 				last_collection = curr_collection
+				used_collections.Add(curr_collection)
 			} else {
 				valid = false
 				return
@@ -227,7 +236,7 @@ func (this *AccessRules) analyzeVariableParts(my_collection_name string, token_a
 				has_relation := false
 				var relation types.TableField
 				for _, field := range curr_collection.Fields {
-					if field.IsForeignKey && field.FkTableName.String == last_collection.Name {
+					if field.IsForeignKey && field.FkRefersToTable.String == last_collection.Name {
 						has_relation = true
 						relation = field
 						break
@@ -241,15 +250,15 @@ func (this *AccessRules) analyzeVariableParts(my_collection_name string, token_a
 
 				last_collection = curr_collection
 				used_collections.Add(curr_collection)
-				token_as_variable.PartToCollection[variable_parts[i]] = curr_collection
-				// token_as_variable.PartToCollectionField[variable_parts[i]] = types.TableField{
-				// FkFieldName: types.NullString{
-				// Valid: true,
-				// String: relation.FieldName,
-				// },
-				// }
-				token_as_variable.PartToCollectionField[variable_parts[i]] = relation
-				token_as_variable.ExtandsToList = true
+                token_as_variable.Fields = token_as_variable.Fields[:len(token_as_variable.Fields) - 1]
+                token_as_variable.LastFieldRefersToField = relation.FieldName
+
+                // l := len(token_as_variable.Fields) - 1
+                // token_as_variable.Fields[l].FieldName = relation.FieldName
+				// token_as_variable.Fields[l].ViaChildToParent = false
+                // token_as_variable.Fields[l].FieldTable = curr_collection.Name
+                // token_as_variable.Fields[i - 1].FieldForeignKeyRefersToTable = last_collection.Name
+                break
 			} else {
 				// its not a list
 				valid = false
@@ -262,6 +271,11 @@ func (this *AccessRules) analyzeVariableParts(my_collection_name string, token_a
 		valid = false
 		return
 	}
+
+    last_index := len(token_as_variable.Fields) - 1
+    token_as_variable.Fields[last_index].FieldName = variable_parts[len(variable_parts) - 1]
+    token_as_variable.Fields[last_index].FieldTable = last_collection.Name
+    token_as_variable.Fields[last_index].ViaChildToParent = false
 
 	valid = true
 	return

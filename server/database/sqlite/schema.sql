@@ -23,8 +23,7 @@ CREATE TABLE IF NOT EXISTS table_fields (
     field_options text,
 
     is_foreign_key boolean NOT NULL DEFAULT FALSE,
-    fk_table_name text,
-    fk_field_name text,
+    fk_refers_to_table text,
 
     FOREIGN KEY(collection_id) REFERENCES collections(id) ON DELETE CASCADE
 );

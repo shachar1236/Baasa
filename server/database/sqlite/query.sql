@@ -57,8 +57,7 @@ SELECT collections.id AS collection_id,
     table_fields.field_type,
     table_fields.field_options,
     table_fields.is_foreign_key,
-    table_fields.fk_table_name,
-    table_fields.fk_field_name
+    table_fields.fk_refers_to_table
 FROM collections
     LEFT JOIN table_fields ON collections.id = table_fields.collection_id WHERE collections.table_name = ?;
 
@@ -71,8 +70,7 @@ SELECT collections.id AS collection_id,
     table_fields.field_type,
     table_fields.field_options,
     table_fields.is_foreign_key,
-    table_fields.fk_table_name,
-    table_fields.fk_field_name
+    table_fields.fk_refers_to_table
 FROM collections
     LEFT JOIN table_fields ON collections.id = table_fields.collection_id
 WHERE collections.id = ?;
@@ -86,8 +84,7 @@ SELECT collections.id AS collection_id,
        table_fields.field_type, 
        table_fields.field_options,
        table_fields.is_foreign_key,
-       table_fields.fk_table_name,
-       table_fields.fk_field_name
+       table_fields.fk_refers_to_table
 FROM collections 
 LEFT JOIN table_fields ON collections.id = table_fields.collection_id;
 
@@ -96,8 +93,8 @@ INSERT INTO collections (table_name)
 VALUES (?) RETURNING *;
 
 -- name: CreateField :exec
-INSERT INTO table_fields (field_name, field_type, field_options, collection_id, is_foreign_key, fk_table_name, fk_field_name)
-VALUES (?, ?, ?, ?, ?, ?, ?);
+INSERT INTO table_fields (field_name, field_type, field_options, collection_id, is_foreign_key, fk_refers_to_table)
+VALUES (?, ?, ?, ?, ?, ?);
 
 -- name: DeleteCollection :exec
 DELETE FROM collections WHERE table_name = ?;
@@ -115,10 +112,10 @@ UPDATE table_fields SET field_type = ? WHERE id = ?;
 UPDATE table_fields SET field_options = ? WHERE id = ?;
 
 -- name: ChangeFieldToForeignKey :exec
-UPDATE table_fields SET is_foreign_key = true, field_type = ?, fk_table_name = ?, fk_field_name = ? WHERE id = ?;
+UPDATE table_fields SET is_foreign_key = true, field_type = ?, fk_refers_to_table  = ? WHERE id = ?;
 
 -- name: ChangeFieldToNotBeForeignKey :exec
-UPDATE table_fields SET is_foreign_key = false, fk_table_name = null, fk_field_name = null WHERE id = ?;
+UPDATE table_fields SET is_foreign_key = false, fk_refers_to_table = null WHERE id = ?;
 
 
 -- name: DeleteField :exec
