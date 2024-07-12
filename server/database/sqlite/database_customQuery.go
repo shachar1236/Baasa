@@ -137,44 +137,44 @@ func (db *SqliteDB) RunUserCustomQuery(
 
 func createExpandedSelect(token_as_variable *types.TokenValueVariable, sb *strings.Builder, used_collections_filters map[string]string) {
 	last_index := len(token_as_variable.Fields) - 1
-
-	curr_field := token_as_variable.Fields[last_index]
+	curr_field := token_as_variable.Fields[last_index].Field
 	sb.WriteString("(SELECT ")
 	sb.WriteString(curr_field.FieldName)
 	sb.WriteString(" FROM ")
-	sb.WriteString(curr_field.FieldTable)
+	sb.WriteString(curr_field.FieldCollection)
 	sb.WriteString(" WHERE ")
-	for i := last_index - 1; i > 0; i-- {
-		curr_field = token_as_variable.Fields[i]
-		field_name := curr_field.FieldName
-		field_table := curr_field.FieldTable
-		relation_field := "id"
-		// if curr_field.ViaChildToParent {
-			// relation_field = field_name
-			// field_name = "id"
-		// }
-		sb.WriteString(relation_field)
-		sb.WriteString(" = (SELECT ")
-		sb.WriteString(field_name)
+
+	startIndex := last_index - 1
+	curr_part := token_as_variable.Fields[last_index-1]
+	closingParenthesseis := " LIMIT 1)"
+	if curr_part.PartType == types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_TYPE {
+		sb.WriteString(curr_part.Collection.FkToLastPartName)
+		sb.WriteString(" = ")
+		startIndex--
+		closingParenthesseis = ")"
+	} else {
+		sb.WriteString("id = ")
+	}
+
+	for i := startIndex; i > 0; i-- {
+		curr_field := token_as_variable.Fields[i].Field
+		sb.WriteString("(SELECT ")
+		sb.WriteString(curr_field.FieldName)
 		sb.WriteString(" FROM ")
-		sb.WriteString(field_table)
-		sb.WriteString(" WHERE ")
+		sb.WriteString(curr_field.FieldCollection)
+		sb.WriteString(" WHERE id = ")
 	}
 
-	curr_field = token_as_variable.Fields[0]
-	sb.WriteString(token_as_variable.LastFieldRefersToField)
-	sb.WriteString(" = ")
-	sb.WriteString(curr_field.FieldName)
+	curr_part = token_as_variable.Fields[0]
+	sb.WriteString(curr_part.Field.FieldCollection)
+	sb.WriteString(".")
+	sb.WriteString(curr_part.Field.FieldName)
 
-	for i := 0; i < last_index; i++ {
-		curr_field = token_as_variable.Fields[i]
-		if !curr_field.ViaChildToParent {
-			sb.WriteString(" LIMIT 1)")
-		} else {
-			sb.WriteString(")")
-		}
+	for i := startIndex; i > 1; i-- {
+		sb.WriteString(" LIMIT 1)")
 	}
 
+	sb.WriteString(closingParenthesseis)
 }
 
 // posts.user.father.mentor.name = "shachar"
@@ -217,7 +217,10 @@ func createExpandedSelect(token_as_variable *types.TokenValueVariable, sb *strin
 // { "field_name": "mentor", "table": "Users",  "field_foreign_key_to": "mentors"}
 // { "field_name": "title", "table": "Posts",  "field_foreign_key_to": ""}
 
-
 // Posts.user
 // { "field_name": "mentor", "table": "Users",  "field_foreign_key_to": "id"}
 // { "field_name": "title", "table": "Posts",  "field_foreign_key_to": "user"}
+// ---------------
+// { "type": "field", "field_name": "Posts.user", "table": "Posts",  "field_foreign_key_to": "users"}
+// { "type": "field", "field_name": "mentor", "table": "Users",  "field_foreign_key_to": "mentors"}
+// { "type": "Table", "field_name": "mentor", "table": "Users",  "field_foreign_key_to": "mentors"}

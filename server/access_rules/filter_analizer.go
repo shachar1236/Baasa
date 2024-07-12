@@ -177,14 +177,13 @@ func (this *AccessRules) analyzeVariableParts(my_collection_name string, token_a
 		return
 	}
 
-	token_as_variable.Fields = make([]types.TokenValueVariableFields, len(variable_parts)-1)
-    token_as_variable.LastFieldRefersToField = "id"
+	token_as_variable.Fields = make([]types.TokenValueVariableField, len(variable_parts)-1)
 
-	token_as_variable.Fields[0] = types.TokenValueVariableFields{
-		FieldName:        variable_parts[0] + "." + variable_parts[1],
-		FieldTable:       variable_parts[0],
-		ViaChildToParent: false,
-	}
+    // token_as_variable.Fields[0].PartType = types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_FIELD_TYPE
+    // token_as_variable.Fields[0].Field = struct{FieldName string; FieldCollection string}{
+        // FieldName: token_as_variable.Parts[0] + "." + token_as_variable.Parts[1],
+        // FieldCollection: last_collection.Name,
+    // }
 
 	last_collection := my_collection
 	for i := 1; i < len(variable_parts)-1; i++ {
@@ -200,11 +199,10 @@ func (this *AccessRules) analyzeVariableParts(my_collection_name string, token_a
 
 		if my_field.ID != -1 {
 
-            if i != 1 {
-                token_as_variable.Fields[i - 1].FieldName = variable_parts[i]
-                token_as_variable.Fields[i - 1].FieldTable = last_collection.Name
-                token_as_variable.Fields[i - 1].FieldForeignKeyRefersToTable = my_field.FkRefersToTable.String
-                token_as_variable.Fields[i - 1].ViaChildToParent = false
+            token_as_variable.Fields[i-1].PartType = types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_FIELD_TYPE
+            token_as_variable.Fields[i-1].Field = struct{FieldName string; FieldCollection string}{
+                FieldName: my_field.FieldName,
+                FieldCollection: last_collection.Name,
             }
 
 			if my_field.IsForeignKey {
@@ -248,17 +246,15 @@ func (this *AccessRules) analyzeVariableParts(my_collection_name string, token_a
 					return
 				}
 
+                token_as_variable.Fields[i-1].PartType = types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_TYPE
+                token_as_variable.Fields[i-1].Collection = struct{CollectionName string;FkToLastPartName string}{
+                    CollectionName: curr_collection.Name,
+                    FkToLastPartName: relation.FieldName,
+                }
+
+
 				last_collection = curr_collection
 				used_collections.Add(curr_collection)
-                token_as_variable.Fields = token_as_variable.Fields[:len(token_as_variable.Fields) - 1]
-                token_as_variable.LastFieldRefersToField = relation.FieldName
-
-                // l := len(token_as_variable.Fields) - 1
-                // token_as_variable.Fields[l].FieldName = relation.FieldName
-				// token_as_variable.Fields[l].ViaChildToParent = false
-                // token_as_variable.Fields[l].FieldTable = curr_collection.Name
-                // token_as_variable.Fields[i - 1].FieldForeignKeyRefersToTable = last_collection.Name
-                break
 			} else {
 				// its not a list
 				valid = false
@@ -273,9 +269,12 @@ func (this *AccessRules) analyzeVariableParts(my_collection_name string, token_a
 	}
 
     last_index := len(token_as_variable.Fields) - 1
-    token_as_variable.Fields[last_index].FieldName = variable_parts[len(variable_parts) - 1]
-    token_as_variable.Fields[last_index].FieldTable = last_collection.Name
-    token_as_variable.Fields[last_index].ViaChildToParent = false
+    token_as_variable.Fields[last_index].PartType = types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_FIELD_TYPE
+    token_as_variable.Fields[last_index].Field = struct{FieldName string; FieldCollection string}{
+        FieldName: variable_parts[len(variable_parts) - 1],
+        FieldCollection: last_collection.Name,
+    }
+
 
 	valid = true
 	return

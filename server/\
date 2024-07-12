@@ -82,26 +82,17 @@ type TokenValue interface {
     // ExtandsToList bool
 // }
 
-const (
-    TOKEN_VALUE_VARIABLE_PART_COLLECTION_TYPE = iota
-    TOKEN_VALUE_VARIABLE_PART_COLLECTION_FIELD_TYPE = iota
-)
-
 type TokenValueVariableField struct {
-    PartType int
-    Field struct{
-        FieldName string
-        FieldCollection string
-    }
-    Collection struct {
-        CollectionName string
-        FkToLastPartName string
-    }
+    FieldName string
+    FieldTable string
+    FieldForeignKeyRefersToTableField string
+    // ViaChildToParent bool `default:false`
 }
 
 type TokenValueVariable struct {
     Parts []string
     Fields []TokenValueVariableField
+    LastFieldRefersToField string
 }
 
 func (value TokenValueVariable) GetType() int {
