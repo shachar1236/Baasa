@@ -9,12 +9,13 @@ import (
 
 	"github.com/shachar1236/Baasa/access_rules"
 	"github.com/shachar1236/Baasa/database"
+	querylang "github.com/shachar1236/Baasa/query_lang"
 )
 
 const portNum string = ":5050"
 
 
-func RunApi(ctx context.Context, err_channel chan error, db database.Database, access_rules *access_rules.AccessRules) {
+func RunApi(ctx context.Context, err_channel chan error, db database.Database, access_rules *access_rules.AccessRules, query_lang_analyzer *querylang.Analyzer) {
 	mux := http.NewServeMux()
 
     logFile, err := os.OpenFile("logs/api.log", os.O_CREATE | os.O_APPEND | os.O_RDWR, 0666)
@@ -26,7 +27,7 @@ func RunApi(ctx context.Context, err_channel chan error, db database.Database, a
     }
     logger := slog.New(slog.NewTextHandler(mw, &slog.HandlerOptions{AddSource: true}))
 
-    addRoutes(mux, logger, db, access_rules)
+    addRoutes(mux, logger, db, access_rules, query_lang_analyzer)
 
 	logger.Info("Started on port " + portNum)
 	logger.Info("To close connection CTRL+C :-)")

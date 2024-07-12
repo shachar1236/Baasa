@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/leporo/sqlf"
-	"github.com/shachar1236/Baasa/database/types"
+	querylang_types "github.com/shachar1236/Baasa/query_lang/types"
 )
 
 var sb = strings.Builder{}
@@ -15,7 +15,7 @@ var sb_mutex = sync.Mutex{}
 func (db *SqliteDB) BuildUserCustomQuery(
 	collection_name string,
 	fields []string,
-	filter_tokens []types.Token,
+	filter_tokens []querylang_types.Token,
 	sort_by string,
 	expand string,
 	used_collections_filters map[string]string,
@@ -26,9 +26,9 @@ func (db *SqliteDB) BuildUserCustomQuery(
 	defer sb.Reset()
 
 	for _, token := range filter_tokens {
-		if token.Type == types.TOKEN_OPERATOR {
+		if token.Type == querylang_types.TOKEN_OPERATOR {
 			// TODO: change for supporting special operators
-			token_as_string := token.Value.(types.TokenValueString)
+			token_as_string := token.Value.(querylang_types.TokenValueString)
 			// sb.WriteString(string(token_as_string))
 			switch token_as_string {
 			case "&&":
@@ -85,8 +85,8 @@ func (db *SqliteDB) BuildUserCustomQuery(
 				sb.WriteString(" ")
 				break
 			}
-		} else if token.Type == types.TOKEN_VARIABLE_TYPE {
-			token_as_variable := token.Value.(types.TokenValueVariable)
+		} else if token.Type == querylang_types.TOKEN_VARIABLE_TYPE {
+			token_as_variable := token.Value.(querylang_types.TokenValueVariable)
 			variable_parts := token_as_variable.Parts
 			if len(variable_parts) > 2 {
 				// its nested collections
@@ -100,7 +100,7 @@ func (db *SqliteDB) BuildUserCustomQuery(
 				// not valid
 			}
 		} else {
-			token_as_string := token.Value.(types.TokenValueString)
+			token_as_string := token.Value.(querylang_types.TokenValueString)
 			sb.WriteString(string(token_as_string))
 		}
 		sb.WriteString(" ")
@@ -120,7 +120,7 @@ func (db *SqliteDB) BuildUserCustomQuery(
 func (db *SqliteDB) RunUserCustomQuery(
 	collection_name string,
 	fields []string,
-	filter_tokens []types.Token,
+	filter_tokens []querylang_types.Token,
 	sort_by string,
 	expand string,
 	used_collections_filters map[string]string, // map[collection_name]filters
@@ -139,7 +139,7 @@ func (db *SqliteDB) RunUserCustomQuery(
 	return
 }
 
-func createExpandedSelect(token_as_variable *types.TokenValueVariable, sb *strings.Builder, used_collections_filters map[string]string) {
+func createExpandedSelect(token_as_variable *querylang_types.TokenValueVariable, sb *strings.Builder, used_collections_filters map[string]string) {
 	last_index := len(token_as_variable.Fields) - 1
 	curr_field := token_as_variable.Fields[last_index].Field
 	sb.WriteString("(SELECT ")
@@ -156,7 +156,7 @@ func createExpandedSelect(token_as_variable *types.TokenValueVariable, sb *strin
 	startIndex := last_index - 1
 	curr_part := token_as_variable.Fields[last_index-1]
 	closingParenthesseis := " LIMIT 1)"
-	if curr_part.PartType == types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_TYPE {
+	if curr_part.PartType == querylang_types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_TYPE {
 		sb.WriteString(curr_part.Collection.FkToLastPartName)
 		sb.WriteString(" = ")
 		startIndex--
@@ -204,50 +204,3 @@ func createExpandedSelect(token_as_variable *types.TokenValueVariable, sb *strin
 	sb.WriteString(closingParenthesseis)
 }
 
-// posts.user.father.mentor.name = "shachar"
-// (SELECT name FROM mentors WHERE id = (SELECT mentor FROM fathers WHERE id = (SELECT father FROM users WHERE id = posts.user))
-// { "field_name": "posts.user", "table": "posts",  "field_foreign_key_to": ""}
-
-// { "field_name": "father", "table": "users",  "field_foreign_key_to": ["fathers", "id"]}
-// { "field_name": "mentor", "table": "fathers",  "field_foreign_key_to": ["mentors", "id"]}
-
-// { "field_name": "name", "table": "mentors",  "field_foreign_key_to": ""}
-
-// posts.user.mentor.name = "shachar"
-// (SELECT name FROM mentors WHERE id = (SELECT mentor FROM users WHERE id = posts.user)) == "shachar"
-// fields =
-
-// --->
-// posts.user.name == 'shachar'
-// (SELECT name FROM users WHERE id = posts.user) == 'shachar'
-// fields =
-// { "field_name": "Posts.user", "table": "Posts",  "field_foreign_key_to": []}
-// { "field_name": "name", "table": "users",  "field_foreign_key_to": []}
-
-// 'test' . Posts.user.Comments.content
-// 'test' IN (SELECT content FROM Comments WHERE created_by_user = (SELECT id FROM users WHERE name = Posts.user))
-// fields =
-// { "field_name": "Posts.user", "table": "Posts",  "field_foreign_key_to": []}
-
-// { "field_name": "id", "table": "users",  "field_foreign_key_refers_to": ["Comments", "created_by_user"]} ||
-//      { "field_name": "created_by_user", "table": "Comments", via_child_to_parent = true,  "field_foreign_key_refers_to": ["Users", "id"]}
-
-// { "field_name": "content", "table": "Comments",  "field_foreign_key_to": ""}
-
-// ------------
-// { "field_name": "Posts.user", "table": "Posts",  "field_foreign_key_to": []}
-// { "field_name": "content", "table": "Comments",  "field_foreign_key_to": ""}
-
-// 'test' . Posts.user.mentor.Posts.title
-// 'test' IN (SELECT title FROM Posts WHERE user = (SELECT mentor FROM Users WHERE id = Posts.user))
-// { "field_name": "Posts.user", "table": "Posts",  "field_foreign_key_to": ""}
-// { "field_name": "mentor", "table": "Users",  "field_foreign_key_to": "mentors"}
-// { "field_name": "title", "table": "Posts",  "field_foreign_key_to": ""}
-
-// Posts.user
-// { "field_name": "mentor", "table": "Users",  "field_foreign_key_to": "id"}
-// { "field_name": "title", "table": "Posts",  "field_foreign_key_to": "user"}
-// ---------------
-// { "type": "field", "field_name": "Posts.user", "table": "Posts",  "field_foreign_key_to": "users"}
-// { "type": "field", "field_name": "mentor", "table": "Users",  "field_foreign_key_to": "mentors"}
-// { "type": "Table", "field_name": "mentor", "table": "Users",  "field_foreign_key_to": "mentors"}

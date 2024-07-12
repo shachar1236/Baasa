@@ -13,10 +13,11 @@ import (
 func run(ctx context.Context, w io.Writer, args []string) error {
     db := GetDatabase(ctx, args)
     access_rules := GetAccessRules(ctx, args, db)
+    query_lang_analyzer := GetQueryLangAnalyzer(ctx, args, db)
 
     err_channel := make(chan error)
     go dashboard.RunDashboard(ctx, err_channel, db)
-    api.RunApi(ctx, err_channel, db, &access_rules)
+    api.RunApi(ctx, err_channel, db, &access_rules, &query_lang_analyzer)
 
     return <-err_channel
 }

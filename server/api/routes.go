@@ -8,13 +8,15 @@ import (
 	"github.com/shachar1236/Baasa/access_rules"
 	"github.com/shachar1236/Baasa/database"
 	"github.com/shachar1236/Baasa/database/types"
+	querylang "github.com/shachar1236/Baasa/query_lang"
 )
 
 const SEARCH_RULES_FILENAME = "search.lua"
+const BASE_LIMIT = 1000
 
-func addRoutes(mux *http.ServeMux, logger *slog.Logger, db database.Database, access_rules *access_rules.AccessRules) {
+func addRoutes(mux *http.ServeMux, logger *slog.Logger, db database.Database, access_rules *access_rules.AccessRules, query_lang_analyzer *querylang.Analyzer) {
 	mux.Handle("/query", handleQuery(logger, db, access_rules))
-	mux.Handle("/collection/search", handleCollectionSearch(logger, db, access_rules))
+	mux.Handle("/collection/search", handleCollectionSearch(logger, db, access_rules, query_lang_analyzer))
 	mux.Handle("/", http.NotFoundHandler())
 }
 
@@ -109,7 +111,7 @@ func handleQuery(logger *slog.Logger, db database.Database, ar *access_rules.Acc
 	)
 }
 
-func handleCollectionSearch(logger *slog.Logger, db database.Database, ar *access_rules.AccessRules) http.Handler {
+func handleCollectionSearch(logger *slog.Logger, db database.Database, ar *access_rules.AccessRules, query_lang_anayzer *querylang.Analyzer) http.Handler {
     type SearchMessage struct {
         CollectionName string `json:"CollectionName"`
         Session string `json:"Session"`
@@ -117,6 +119,8 @@ func handleCollectionSearch(logger *slog.Logger, db database.Database, ar *acces
         Filter string `json:"Filter"`
         SortBy string `json:"SortBy"`
         Expand string `json:"Expand"`
+        Limit string `json:"Limit"`
+        Offset string `json:"Offset"`
     }
 
 	return http.HandlerFunc(
@@ -165,7 +169,7 @@ func handleCollectionSearch(logger *slog.Logger, db database.Database, ar *acces
 			if accept {
                 logger.Info("Access rules accepted")
                 // analizing the filter
-                used_collections, isValid, tokens := ar.AnalyzeUserFilter(msg.CollectionName, msg.Filter)
+                used_collections, isValid, tokens := query_lang_anayzer.AnalyzeUserFilter(msg.CollectionName, msg.Filter)
                 if isValid {
                     logger.Info("Filter is valid")
                     used_collections_filters := make(map[string]string)

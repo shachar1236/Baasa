@@ -1,10 +1,14 @@
-package access_rules
+package querylang
 
 import (
 	"context"
-	"strings"
+	"io"
+	"log/slog"
+	"os"
 
+	"github.com/shachar1236/Baasa/database"
 	"github.com/shachar1236/Baasa/database/types"
+	querylang_types "github.com/shachar1236/Baasa/query_lang/types"
 )
 
 // filter language:
@@ -27,141 +31,28 @@ import (
 
 const numbers = "0123456789."
 
-func is_white_space(c byte) bool {
-	return c == ' ' || c == '\n'
+type Analyzer struct {
+	logger *slog.Logger
+	db     database.Database
 }
 
-type CollectionsSet struct {
-	collections map[string]types.Collection
+func New(db database.Database) Analyzer {
+	logFile, err := os.OpenFile("logs/query_lang_analyzer.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	var mw io.Writer
+	if err != nil {
+		mw = os.Stdout
+	} else {
+		mw = io.MultiWriter(os.Stdout, logFile)
+	}
+	logger := slog.New(slog.NewTextHandler(mw, &slog.HandlerOptions{AddSource: true}))
+
+	return Analyzer{
+        logger: logger,
+        db: db,
+    }
 }
 
-func (set *CollectionsSet) Init() {
-	set.collections = make(map[string]types.Collection)
-}
-
-func (set *CollectionsSet) Add(collection types.Collection) {
-	set.collections[collection.Name] = collection
-}
-
-func (set *CollectionsSet) GetMap() map[string]types.Collection {
-	return set.collections
-}
-
-func (set *CollectionsSet) Union(added_collection_set CollectionsSet) {
-	for k, v := range added_collection_set.collections {
-		set.collections[k] = v
-	}
-}
-
-type lexer struct {
-	str string
-	i   int
-}
-
-func (this *lexer) Next() types.Token {
-	start := this.i
-
-	if start >= len(this.str) {
-		return types.Token{
-			Type: types.TOKEN_EOF,
-		}
-	}
-
-	for is_white_space(this.str[start]) {
-		start++
-		if start > len(this.str) {
-			return types.Token{
-				Type: types.TOKEN_EOF,
-			}
-		}
-	}
-
-	if this.str[start] == '(' {
-		this.i = start + 1
-		return types.Token{
-			Value: types.TokenValueString("("),
-			Type:  types.TOKEN_OPEN_PARENTHESIS,
-		}
-	}
-
-	if this.str[start] == ')' {
-		this.i = start + 1
-		return types.Token{
-			Value: types.TokenValueString(")"),
-			Type:  types.TOKEN_CLOSE_PARENTHESIS,
-		}
-	}
-
-	end := start
-	for end < len(this.str) && !is_white_space(this.str[end]) {
-		end++
-	}
-
-	my_token := this.str[start:end]
-	this.i = end
-
-	// checking if token is string
-	if len(my_token) > 1 {
-		if (my_token[0] == '\'' && my_token[len(my_token)-1] == '\'') || (my_token[0] == '"' && my_token[len(my_token)-1] == '"') {
-			return types.Token{
-				Value: types.TokenValueString(my_token),
-				Type:  types.TOKEN_STRING_TYPE,
-			}
-		}
-	}
-
-	// checking if token is operator or collection
-	for _, operator := range types.Filter_lang_operators {
-		if my_token == operator {
-			return types.Token{
-				Value: types.TokenValueString(my_token),
-				Type:  types.TOKEN_OPERATOR,
-			}
-		}
-	}
-
-	// checking if token is a number
-	is_number := true
-	for _, c := range my_token {
-		is_inside := false
-		for _, number := range numbers {
-			if c == number {
-				is_inside = true
-				break
-			}
-		}
-
-		if !is_inside {
-			is_number = false
-			break
-		}
-	}
-
-	if is_number {
-		return types.Token{
-			Value: types.TokenValueString(my_token),
-			Type:  types.TOKEN_NUMBER_TYPE,
-		}
-	}
-
-	return types.Token{
-		Value: types.TokenValueVariable{
-			Parts: strings.Split(my_token, "."),
-		},
-		Type: types.TOKEN_VARIABLE_TYPE,
-	}
-}
-
-func hasCollection(collections []types.Collection, collection_name string) bool {
-	for _, curr_collection := range collections {
-		if curr_collection.Name == collection_name {
-			return true
-		}
-	}
-	return false
-}
-
-func (this *AccessRules) analyzeVariableParts(my_collection_name string, token_as_variable *types.TokenValueVariable) (valid bool, used_collections CollectionsSet) {
+func (this *Analyzer) AnalyzeVariableParts(my_collection_name string, token_as_variable *querylang_types.TokenValueVariable) (valid bool, used_collections querylang_types.CollectionsSet) {
 	variable_parts := token_as_variable.Parts
 	used_collections.Init()
 	// its nested collections
@@ -177,7 +68,7 @@ func (this *AccessRules) analyzeVariableParts(my_collection_name string, token_a
 		return
 	}
 
-	token_as_variable.Fields = make([]types.TokenValueVariablePart, len(variable_parts)-1)
+	token_as_variable.Fields = make([]querylang_types.TokenValueVariablePart, len(variable_parts)-1)
 
 	last_collection := my_collection
 	for i := 1; i < len(variable_parts)-1; i++ {
@@ -193,8 +84,8 @@ func (this *AccessRules) analyzeVariableParts(my_collection_name string, token_a
 
 		if my_field.ID != -1 {
 
-            token_as_variable.Fields[i-1].PartType = types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_FIELD_TYPE
-            token_as_variable.Fields[i-1].Field = types.TokenValueVariablePartField{
+            token_as_variable.Fields[i-1].PartType = querylang_types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_FIELD_TYPE
+            token_as_variable.Fields[i-1].Field = querylang_types.TokenValueVariablePartField{
                 FieldName: my_field.FieldName,
                 FieldCollection: last_collection.Name,
             }
@@ -242,7 +133,7 @@ func (this *AccessRules) analyzeVariableParts(my_collection_name string, token_a
 					return
 				}
 
-                token_as_variable.Fields[i-1].PartType = types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_TYPE
+                token_as_variable.Fields[i-1].PartType = querylang_types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_TYPE
                 token_as_variable.Fields[i-1].Collection = struct{CollectionName string;FkToLastPartName string}{
                     CollectionName: curr_collection.Name,
                     FkToLastPartName: relation.FieldName,
@@ -265,8 +156,8 @@ func (this *AccessRules) analyzeVariableParts(my_collection_name string, token_a
 	}
 
     last_index := len(token_as_variable.Fields) - 1
-    token_as_variable.Fields[last_index].PartType = types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_FIELD_TYPE
-    token_as_variable.Fields[last_index].Field = types.TokenValueVariablePartField{
+    token_as_variable.Fields[last_index].PartType = querylang_types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_FIELD_TYPE
+    token_as_variable.Fields[last_index].Field = querylang_types.TokenValueVariablePartField{
         FieldName: variable_parts[len(variable_parts) - 1],
         FieldCollection: last_collection.Name,
     }
@@ -276,7 +167,7 @@ func (this *AccessRules) analyzeVariableParts(my_collection_name string, token_a
 	return
 }
 
-func (this *AccessRules) AnalyzeUserFilter(my_collection_name string, filter string) (used_collections CollectionsSet, valid bool, tokens []types.Token) {
+func (this *Analyzer) AnalyzeUserFilter(my_collection_name string, filter string) (used_collections querylang_types.CollectionsSet, valid bool, tokens []querylang_types.Token) {
 	valid = true
 	lex := lexer{
 		str: filter,
@@ -284,10 +175,10 @@ func (this *AccessRules) AnalyzeUserFilter(my_collection_name string, filter str
 	}
 
 	used_collections.Init()
-	tokens = make([]types.Token, 0)
+	tokens = make([]querylang_types.Token, 0)
 
-	last_important_token := types.Token{
-		Type: types.TOKEN_EOF,
+	last_important_token := querylang_types.Token{
+		Type: querylang_types.TOKEN_EOF,
 	}
 
 	is_left_side := true
@@ -296,44 +187,44 @@ func (this *AccessRules) AnalyzeUserFilter(my_collection_name string, filter str
 		// getting token
 		curr_token := lex.Next()
 
-		if curr_token.Type == types.TOKEN_EOF {
+		if curr_token.Type == querylang_types.TOKEN_EOF {
 			break
 		}
 
 		// check if its two operator in a row or two variables in a row
-		if last_important_token.Type != types.TOKEN_EOF {
-			if last_important_token.Type == types.TOKEN_OPERATOR && curr_token.Type == types.TOKEN_OPERATOR {
+		if last_important_token.Type != querylang_types.TOKEN_EOF {
+			if last_important_token.Type == querylang_types.TOKEN_OPERATOR && curr_token.Type == querylang_types.TOKEN_OPERATOR {
 				valid = false
 				return
 			}
-			if last_important_token.Type != types.TOKEN_OPERATOR && curr_token.Type != types.TOKEN_OPERATOR {
+			if last_important_token.Type != querylang_types.TOKEN_OPERATOR && curr_token.Type != querylang_types.TOKEN_OPERATOR {
 				valid = false
 				return
 			}
 		} else {
 			// checking if start token is operator or EOF
-			if curr_token.Type == types.TOKEN_OPERATOR || curr_token.Type == types.TOKEN_EOF {
+			if curr_token.Type == querylang_types.TOKEN_OPERATOR || curr_token.Type == querylang_types.TOKEN_EOF {
 				valid = false
 				return
 			}
 		}
 
 		// if last
-		if curr_token.Type == types.TOKEN_EOF {
+		if curr_token.Type == querylang_types.TOKEN_EOF {
 			return
 		}
 
 		// changing side
-		if curr_token.Type == types.TOKEN_VARIABLE_TYPE || curr_token.Type == types.TOKEN_NUMBER_TYPE {
+		if curr_token.Type == querylang_types.TOKEN_VARIABLE_TYPE || curr_token.Type == querylang_types.TOKEN_NUMBER_TYPE {
 			is_left_side = !is_left_side
 		}
 
 		// checking if its a variable
-		if curr_token.Type == types.TOKEN_VARIABLE_TYPE {
+		if curr_token.Type == querylang_types.TOKEN_VARIABLE_TYPE {
 			// its a variable
-			token_as_variable := curr_token.Value.(types.TokenValueVariable)
+			token_as_variable := curr_token.Value.(querylang_types.TokenValueVariable)
 			if len(token_as_variable.Parts) > 2 {
-				my_valid, added_used_collections := this.analyzeVariableParts(my_collection_name, &token_as_variable)
+				my_valid, added_used_collections := this.AnalyzeVariableParts(my_collection_name, &token_as_variable)
 				if !my_valid {
 					valid = false
 					return
@@ -365,7 +256,7 @@ func (this *AccessRules) AnalyzeUserFilter(my_collection_name string, filter str
 			}
 		}
 
-		if curr_token.Type != types.TOKEN_OPEN_PARENTHESIS && curr_token.Type != types.TOKEN_CLOSE_PARENTHESIS {
+		if curr_token.Type != querylang_types.TOKEN_OPEN_PARENTHESIS && curr_token.Type != querylang_types.TOKEN_CLOSE_PARENTHESIS {
 			last_important_token = curr_token
 		}
 
@@ -375,11 +266,3 @@ func (this *AccessRules) AnalyzeUserFilter(my_collection_name string, filter str
 	return
 }
 
-func DoesCollectionHasField(collection types.Collection, field_name string) bool {
-	for _, field := range collection.Fields {
-		if field.FieldName == field_name {
-			return true
-		}
-	}
-	return false
-}
