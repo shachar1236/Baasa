@@ -87,21 +87,27 @@ const (
     TOKEN_VALUE_VARIABLE_PART_COLLECTION_FIELD_TYPE = iota
 )
 
-type TokenValueVariableField struct {
+type TokenValueVariablePartField struct {
+    FieldName string
+    FieldCollection string
+    // if field not fk then fk = ""
+    FkRefersToCollection string
+}
+
+type TokenValueVariablePartCollection struct {
+    CollectionName string
+    FkToLastPartName string
+}
+
+type TokenValueVariablePart struct {
     PartType int
-    Field struct{
-        FieldName string
-        FieldCollection string
-    }
-    Collection struct {
-        CollectionName string
-        FkToLastPartName string
-    }
+    Field TokenValueVariablePartField
+    Collection TokenValueVariablePartCollection
 }
 
 type TokenValueVariable struct {
     Parts []string
-    Fields []TokenValueVariableField
+    Fields []TokenValueVariablePart
 }
 
 func (value TokenValueVariable) GetType() int {

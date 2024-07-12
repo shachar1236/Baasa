@@ -20,7 +20,6 @@ func (db *SqliteDB) BuildUserCustomQuery(
 	expand string,
 	used_collections_filters map[string]string,
 ) (query string, err error) {
-	_ = sqlf.Select(strings.Join(fields, ",")).From(collection_name)
 
 	sb_mutex.Lock()
 	defer sb_mutex.Unlock()
@@ -109,7 +108,12 @@ func (db *SqliteDB) BuildUserCustomQuery(
 
 	query = sb.String()
 
-	return
+    sql_query := sqlf.Select(strings.Join(fields, ",")).From(collection_name).Where(sb.String())
+    filters := used_collections_filters[collection_name]
+    if filters != "" {
+        sql_query.Where(filters)
+    }
+	return sql_query.String(), nil
 }
 
 // build and runs user query
@@ -143,6 +147,11 @@ func createExpandedSelect(token_as_variable *types.TokenValueVariable, sb *strin
 	sb.WriteString(" FROM ")
 	sb.WriteString(curr_field.FieldCollection)
 	sb.WriteString(" WHERE ")
+	filters := used_collections_filters[curr_field.FieldCollection]
+	if filters != "" {
+		sb.WriteString(filters)
+		sb.WriteString(" AND ")
+	}
 
 	startIndex := last_index - 1
 	curr_part := token_as_variable.Fields[last_index-1]
@@ -162,15 +171,33 @@ func createExpandedSelect(token_as_variable *types.TokenValueVariable, sb *strin
 		sb.WriteString(curr_field.FieldName)
 		sb.WriteString(" FROM ")
 		sb.WriteString(curr_field.FieldCollection)
-		sb.WriteString(" WHERE id = ")
+		sb.WriteString(" WHERE ")
+		filters := used_collections_filters[curr_field.FieldCollection]
+		if filters != "" {
+			sb.WriteString(filters)
+			sb.WriteString(" AND ")
+		}
+		sb.WriteString("id =  ")
 	}
 
 	curr_part = token_as_variable.Fields[0]
+	curr_field = curr_part.Field
+	filters = used_collections_filters[curr_field.FkRefersToCollection]
+	has_filters := filters != ""
+	if has_filters {
+		sb.WriteString("(SELECT id FROM ")
+		sb.WriteString(curr_field.FieldCollection)
+		sb.WriteString(" WHERE ")
+		sb.WriteString(filters)
+		sb.WriteString(" AND ")
+		sb.WriteString("id =  ")
+		startIndex++
+	}
 	sb.WriteString(curr_part.Field.FieldCollection)
 	sb.WriteString(".")
 	sb.WriteString(curr_part.Field.FieldName)
 
-	for i := startIndex; i > 1; i-- {
+	for i := startIndex; i > 0; i-- {
 		sb.WriteString(" LIMIT 1)")
 	}
 

@@ -177,13 +177,7 @@ func (this *AccessRules) analyzeVariableParts(my_collection_name string, token_a
 		return
 	}
 
-	token_as_variable.Fields = make([]types.TokenValueVariableField, len(variable_parts)-1)
-
-    // token_as_variable.Fields[0].PartType = types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_FIELD_TYPE
-    // token_as_variable.Fields[0].Field = struct{FieldName string; FieldCollection string}{
-        // FieldName: token_as_variable.Parts[0] + "." + token_as_variable.Parts[1],
-        // FieldCollection: last_collection.Name,
-    // }
+	token_as_variable.Fields = make([]types.TokenValueVariablePart, len(variable_parts)-1)
 
 	last_collection := my_collection
 	for i := 1; i < len(variable_parts)-1; i++ {
@@ -200,7 +194,7 @@ func (this *AccessRules) analyzeVariableParts(my_collection_name string, token_a
 		if my_field.ID != -1 {
 
             token_as_variable.Fields[i-1].PartType = types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_FIELD_TYPE
-            token_as_variable.Fields[i-1].Field = struct{FieldName string; FieldCollection string}{
+            token_as_variable.Fields[i-1].Field = types.TokenValueVariablePartField{
                 FieldName: my_field.FieldName,
                 FieldCollection: last_collection.Name,
             }
@@ -213,6 +207,8 @@ func (this *AccessRules) analyzeVariableParts(my_collection_name string, token_a
 					this.logger.Error("Cannot get collection: " + err.Error())
 					return
 				}
+
+                token_as_variable.Fields[i-1].Field.FkRefersToCollection = curr_collection_name
 
 				last_collection = curr_collection
 				used_collections.Add(curr_collection)
@@ -270,7 +266,7 @@ func (this *AccessRules) analyzeVariableParts(my_collection_name string, token_a
 
     last_index := len(token_as_variable.Fields) - 1
     token_as_variable.Fields[last_index].PartType = types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_FIELD_TYPE
-    token_as_variable.Fields[last_index].Field = struct{FieldName string; FieldCollection string}{
+    token_as_variable.Fields[last_index].Field = types.TokenValueVariablePartField{
         FieldName: variable_parts[len(variable_parts) - 1],
         FieldCollection: last_collection.Name,
     }

@@ -169,6 +169,7 @@ func handleCollectionSearch(logger *slog.Logger, db database.Database, ar *acces
                 if isValid {
                     logger.Info("Filter is valid")
                     used_collections_filters := make(map[string]string)
+                    used_collections_filters[msg.CollectionName] = query_filters
                     // checking used collections access rules
                     for collection_name, used_collection := range used_collections.GetMap() {
                         file_path := "access_rules/rules/" + strconv.FormatInt(used_collection.ID, 10) + "/" + SEARCH_RULES_FILENAME
