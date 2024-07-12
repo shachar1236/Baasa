@@ -5,6 +5,7 @@ go 1.22.3
 require github.com/mattn/go-sqlite3 v1.14.22
 
 require (
+	github.com/deckarep/golang-set/v2 v2.6.0 // indirect
 	github.com/jmoiron/sqlx v1.4.0 // indirect
 	github.com/leporo/sqlf v1.4.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect

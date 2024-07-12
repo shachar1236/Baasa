@@ -23,5 +23,6 @@ func GetAccessRules(ctx context.Context, args []string, db database.Database) ac
 }
 
 func GetQueryLangAnalyzer(ctx context.Context, args []string, db database.Database) querylang.Analyzer {
-    return querylang.New(db)
+    analyzer := querylang.New(db)
+    return analyzer
 }

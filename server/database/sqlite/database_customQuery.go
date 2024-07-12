@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/leporo/sqlf"
+    "github.com/deckarep/golang-set/v2"
 	querylang_types "github.com/shachar1236/Baasa/query_lang/types"
 )
 
@@ -17,9 +18,9 @@ func (db *SqliteDB) BuildUserCustomQuery(
 	fields []string,
 	filter_tokens []querylang_types.Token,
 	sort_by string,
-	expand string,
+    analyzed_expand []querylang_types.TokenValueVariable,
 	used_collections_filters map[string]string,
-) (query string, err error) {
+) (where_query string, err error) {
 
 	sb_mutex.Lock()
 	defer sb_mutex.Unlock()
@@ -106,13 +107,29 @@ func (db *SqliteDB) BuildUserCustomQuery(
 		sb.WriteString(" ")
 	}
 
-	query = sb.String()
+	where_query = sb.String()
+    sb.Reset()
 
-    sql_query := sqlf.Select(strings.Join(fields, ",")).From(collection_name).Where(sb.String())
+    select_fields, expand_filters, err := joinExpandedFields(collection_name, analyzed_expand, fields, &sb, used_collections_filters)
+    if err != nil {
+        return "", err
+    }
+    join_query := sb.String()
+    sb.Reset()
+
+    sql_query := sqlf.Select(strings.Join(fields, ",")).Select(strings.Join(select_fields, ",")).From(collection_name)
+    sql_query.Expr(join_query)
+
+    // adding where
+    sql_query = sql_query.Where(where_query)
+    for _, filter := range expand_filters {
+        sql_query = sql_query.Where(filter)
+    }
     filters := used_collections_filters[collection_name]
     if filters != "" {
-        sql_query.Where(filters)
+        sql_query = sql_query.Where(filters)
     }
+
 	return sql_query.String(), nil
 }
 
@@ -122,10 +139,10 @@ func (db *SqliteDB) RunUserCustomQuery(
 	fields []string,
 	filter_tokens []querylang_types.Token,
 	sort_by string,
-	expand string,
+	analyzed_expand []querylang_types.TokenValueVariable,
 	used_collections_filters map[string]string, // map[collection_name]filters
 ) (resJson string, err error) {
-	query, err := db.BuildUserCustomQuery(collection_name, fields, filter_tokens, sort_by, expand, used_collections_filters)
+	query, err := db.BuildUserCustomQuery(collection_name, fields, filter_tokens, sort_by, analyzed_expand, used_collections_filters)
 	if err != nil {
 		db.logger.Error("Error in user custom query: " + err.Error())
 		return
@@ -204,3 +221,55 @@ func createExpandedSelect(token_as_variable *querylang_types.TokenValueVariable,
 	sb.WriteString(closingParenthesseis)
 }
 
+func joinExpandedFields(my_collection_name string, analyzed_expand []querylang_types.TokenValueVariable, fields []string, sb *strings.Builder, used_collections_filters map[string]string) (select_fields []string, where []string, err error) {
+    used_collections := mapset.NewSet[string]()
+    for _, exp := range analyzed_expand {
+        if len(exp.Fields) > 0 {
+            last_part := exp.Fields[len(exp.Fields) - 1]
+            if !used_collections.Contains(last_part.Field.FieldCollection) {
+                sb.WriteString(" LEFT JOIN ")
+                sb.WriteString(last_part.Field.FieldCollection)
+                sb.WriteString(" ON ")
+                sb.WriteString(last_part.Field.FieldCollection)
+                sb.WriteString(".id")
+                sb.WriteString(" = ")
+                var select_token querylang_types.TokenValueVariable
+                if len(exp.Fields) > 2 {
+                    select_token.Parts = exp.Parts[:len(exp.Parts) - 1]
+                    select_token.Fields = exp.Fields[:len(exp.Fields) - 1]
+                    var my_sb strings.Builder
+                    createExpandedSelect(&select_token, &my_sb, used_collections_filters)
+                    sb.WriteString(my_sb.String())
+                } else {
+                    sb.WriteString(exp.Fields[0].Field.FieldName)
+                }
+
+                used_collections.Add(last_part.Field.FieldCollection)
+            }
+
+            if last_part.Field.FieldName != "*" {
+                select_fields = append(select_fields, last_part.Field.FieldCollection + "." + last_part.Field.FieldName)
+            } else {
+                
+            }
+        }
+    }
+
+    iter := used_collections.Iter()
+    for collection := range iter {
+        filters := used_collections_filters[collection]
+        if filters != "" {
+            where = append(where, filters)
+        }
+    }
+
+    return
+}
+
+// collection = Posts
+// fields = [title]
+// expanded = [Posts.user.name]
+
+// SELECT Posts.title, Users.Name FROM Posts 
+//  LEFT JOIN Users
+//  ON Users.id = (SELECT id FROM Users WHERE id = Posts.user AND ...)

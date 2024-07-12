@@ -52,9 +52,13 @@ func New(db database.Database) Analyzer {
     }
 }
 
-func (this *Analyzer) AnalyzeVariableParts(my_collection_name string, token_as_variable *querylang_types.TokenValueVariable) (valid bool, used_collections querylang_types.CollectionsSet) {
+func (this *Analyzer) AnalyzeVariableParts(my_collection_name string, token_as_variable *querylang_types.TokenValueVariable, analyze_type int) (valid bool, used_collections querylang_types.CollectionsSet) {
 	variable_parts := token_as_variable.Parts
 	used_collections.Init()
+
+    is_analyzing_filter := analyze_type == querylang_types.ANALYZE_VARIABLES_PARTS_ANALYZE_TYPE_FILTER
+    is_analyzing_join := analyze_type == querylang_types.ANALYZE_VARIABLES_PARTS_ANALYZE_TYPE_JOIN
+
 	// its nested collections
 	my_collection, err := this.db.GetCollectionByName(context.Background(), variable_parts[0])
 	if err != nil {
@@ -151,8 +155,14 @@ func (this *Analyzer) AnalyzeVariableParts(my_collection_name string, token_as_v
 	}
 
 	if !DoesCollectionHasField(last_collection, variable_parts[len(variable_parts)-1]) {
-		valid = false
-		return
+        if is_analyzing_filter {
+            valid = false
+            return
+        } 
+        if is_analyzing_join && variable_parts[len(variable_parts)-1] != "*" {
+            valid = false
+            return
+        }
 	}
 
     last_index := len(token_as_variable.Fields) - 1
@@ -224,7 +234,7 @@ func (this *Analyzer) AnalyzeUserFilter(my_collection_name string, filter string
 			// its a variable
 			token_as_variable := curr_token.Value.(querylang_types.TokenValueVariable)
 			if len(token_as_variable.Parts) > 2 {
-				my_valid, added_used_collections := this.AnalyzeVariableParts(my_collection_name, &token_as_variable)
+				my_valid, added_used_collections := this.AnalyzeVariableParts(my_collection_name, &token_as_variable, querylang_types.ANALYZE_VARIABLES_PARTS_ANALYZE_TYPE_FILTER)
 				if !my_valid {
 					valid = false
 					return

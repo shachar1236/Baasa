@@ -136,6 +136,11 @@ func getDatabaseGetFunction(db database.Database, logger *slog.Logger) lua.LGFun
 	}
 }
 
+// important!!!!
+// if you change the Filters in your lua script when you put the name of the field you are trying to access you should put the name of the table first
+// example:
+// Users.username - good
+// username - bad!!!
 func (this *AccessRules) CheckRules(rules_file_path string, filters *string, request Request, query_args map[string]any) (bool, error) {
     this.main_lua_state_mutex.Lock()
     defer this.main_lua_state_mutex.Unlock()

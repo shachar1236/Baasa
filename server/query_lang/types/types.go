@@ -2,6 +2,11 @@ package querylang_types
 
 import "github.com/shachar1236/Baasa/database/types"
 
+const (
+    ANALYZE_VARIABLES_PARTS_ANALYZE_TYPE_FILTER = iota
+    ANALYZE_VARIABLES_PARTS_ANALYZE_TYPE_JOIN = iota
+)
+
 type CollectionsSet struct {
 	collections map[string]types.Collection
 }

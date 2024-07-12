@@ -4,11 +4,13 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/shachar1236/Baasa/access_rules"
 	"github.com/shachar1236/Baasa/database"
 	"github.com/shachar1236/Baasa/database/types"
 	querylang "github.com/shachar1236/Baasa/query_lang"
+	querylang_types "github.com/shachar1236/Baasa/query_lang/types"
 )
 
 const SEARCH_RULES_FILENAME = "search.lua"
@@ -118,7 +120,7 @@ func handleCollectionSearch(logger *slog.Logger, db database.Database, ar *acces
         Fields []string `json:"Fields"`
         Filter string `json:"Filter"`
         SortBy string `json:"SortBy"`
-        Expand string `json:"Expand"`
+        Expand []string `json:"Expand"`
         Limit string `json:"Limit"`
         Offset string `json:"Offset"`
     }
@@ -170,6 +172,18 @@ func handleCollectionSearch(logger *slog.Logger, db database.Database, ar *acces
                 logger.Info("Access rules accepted")
                 // analizing the filter
                 used_collections, isValid, tokens := query_lang_anayzer.AnalyzeUserFilter(msg.CollectionName, msg.Filter)
+                analyzed_expand := make([]querylang_types.TokenValueVariable, len(msg.Expand))
+                for i, exp := range msg.Expand {
+                    var token querylang_types.TokenValueVariable
+                    token.Parts = strings.Split(exp, ".")
+                    valid, exp_used_collections := query_lang_anayzer.AnalyzeVariableParts(msg.CollectionName, &token, querylang_types.ANALYZE_VARIABLES_PARTS_ANALYZE_TYPE_JOIN)
+                    if !valid {
+                        return
+                    }
+                    
+                    used_collections.Union(exp_used_collections)
+                    analyzed_expand[i] = token
+                }
                 if isValid {
                     logger.Info("Filter is valid")
                     used_collections_filters := make(map[string]string)
@@ -193,7 +207,7 @@ func handleCollectionSearch(logger *slog.Logger, db database.Database, ar *acces
                     }
 
                     // running query
-                    db.RunUserCustomQuery(msg.CollectionName, msg.Fields, tokens, msg.SortBy, msg.Expand, used_collections_filters)
+                    db.RunUserCustomQuery(msg.CollectionName, msg.Fields, tokens, msg.SortBy, analyzed_expand, used_collections_filters)
                 }
 			}
         },
