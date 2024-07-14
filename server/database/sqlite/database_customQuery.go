@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/leporo/sqlf"
-    "github.com/deckarep/golang-set/v2"
 	querylang_types "github.com/shachar1236/Baasa/query_lang/types"
 )
 
@@ -18,7 +17,7 @@ func (db *SqliteDB) BuildUserCustomQuery(
 	fields []string,
 	filter_tokens []querylang_types.Token,
 	sort_by string,
-    analyzed_expand []querylang_types.TokenValueVariable,
+	analyzed_expand []querylang_types.TokenValueVariable,
 	used_collections_filters map[string]string,
 ) (where_query string, err error) {
 
@@ -108,27 +107,22 @@ func (db *SqliteDB) BuildUserCustomQuery(
 	}
 
 	where_query = sb.String()
-    sb.Reset()
+	sb.Reset()
 
-    select_fields, expand_filters, err := joinExpandedFields(collection_name, analyzed_expand, fields, &sb, used_collections_filters)
-    if err != nil {
-        return "", err
-    }
-    join_query := sb.String()
-    sb.Reset()
+	sql_query := sqlf.Select(strings.Join(fields, ",")).From(collection_name)
 
-    sql_query := sqlf.Select(strings.Join(fields, ",")).Select(strings.Join(select_fields, ",")).From(collection_name)
-    sql_query.Expr(join_query)
+	err = joinExpandedFields(analyzed_expand, sql_query, used_collections_filters)
+	if err != nil {
+		return "", err
+	}
 
-    // adding where
-    sql_query = sql_query.Where(where_query)
-    for _, filter := range expand_filters {
-        sql_query = sql_query.Where(filter)
-    }
-    filters := used_collections_filters[collection_name]
-    if filters != "" {
-        sql_query = sql_query.Where(filters)
-    }
+	join_query := sb.String()
+	sb.Reset()
+
+	sql_query.Expr(join_query)
+
+	// adding where
+	sql_query = sql_query.Where(where_query)
 
 	return sql_query.String(), nil
 }
@@ -221,55 +215,68 @@ func createExpandedSelect(token_as_variable *querylang_types.TokenValueVariable,
 	sb.WriteString(closingParenthesseis)
 }
 
-func joinExpandedFields(my_collection_name string, analyzed_expand []querylang_types.TokenValueVariable, fields []string, sb *strings.Builder, used_collections_filters map[string]string) (select_fields []string, where []string, err error) {
-    used_collections := mapset.NewSet[string]()
-    for _, exp := range analyzed_expand {
-        if len(exp.Fields) > 0 {
-            last_part := exp.Fields[len(exp.Fields) - 1]
-            if !used_collections.Contains(last_part.Field.FieldCollection) {
-                sb.WriteString(" LEFT JOIN ")
-                sb.WriteString(last_part.Field.FieldCollection)
-                sb.WriteString(" ON ")
-                sb.WriteString(last_part.Field.FieldCollection)
-                sb.WriteString(".id")
-                sb.WriteString(" = ")
-                var select_token querylang_types.TokenValueVariable
-                if len(exp.Fields) > 2 {
-                    select_token.Parts = exp.Parts[:len(exp.Parts) - 1]
-                    select_token.Fields = exp.Fields[:len(exp.Fields) - 1]
-                    var my_sb strings.Builder
-                    createExpandedSelect(&select_token, &my_sb, used_collections_filters)
-                    sb.WriteString(my_sb.String())
-                } else {
-                    sb.WriteString(exp.Fields[0].Field.FieldName)
-                }
+func joinExpandedFields(analyzed_expand []querylang_types.TokenValueVariable, builder *sqlf.Stmt, used_collections_filters map[string]string) (err error) {
+	collections := make(map[string][]querylang_types.TokenValueVariable) // map[expand][]falls_under expand
+	for _, exp := range analyzed_expand {
+		if len(exp.Fields) > 0 {
+			start := strings.Join(exp.Parts[:len(exp.Parts)-1], ".")
+			val, ok := collections[start]
+			if !ok {
+				val = make([]querylang_types.TokenValueVariable, 0, 1)
+			}
+			val = append(val, exp)
+			collections[start] = val
+		}
+	}
 
-                used_collections.Add(last_part.Field.FieldCollection)
-            }
 
-            if last_part.Field.FieldName != "*" {
-                select_fields = append(select_fields, last_part.Field.FieldCollection + "." + last_part.Field.FieldName)
-            } else {
-                
-            }
+	for k, v := range collections {
+        exp := v[0]
+        new_table_name := strings.ReplaceAll(k, ".", "_")
+
+        last_part := exp.Fields[len(exp.Fields)-1]
+        var join_on_sb strings.Builder
+        join_on_sb.WriteString(last_part.Field.FieldCollection)
+        join_on_sb.WriteString(".id")
+        join_on_sb.WriteString(" = ")
+        var select_token querylang_types.TokenValueVariable
+        if len(exp.Fields) > 2 {
+            select_token.Parts = make([]string, len(exp.Parts))
+            copy(select_token.Parts, exp.Parts)
+            select_token.Parts[len(select_token.Parts)-1] = "id"
+            select_token.Fields = make([]querylang_types.TokenValueVariablePart, len(exp.Fields))
+            copy(select_token.Fields, exp.Fields)
+            select_token.Fields[len(select_token.Fields)-1].Field.FieldName = "id"
+            select_token.Fields[len(select_token.Fields)-1].Field.FieldCollection = last_part.Field.FieldCollection
+
+            createExpandedSelect(&select_token, &join_on_sb, used_collections_filters)
+        } else {
+            join_on_sb.WriteString(exp.Fields[0].Field.FieldCollection)
+            join_on_sb.WriteString(".")
+            join_on_sb.WriteString(exp.Fields[0].Field.FieldName)
         }
-    }
 
-    iter := used_collections.Iter()
-    for collection := range iter {
-        filters := used_collections_filters[collection]
-        if filters != "" {
-            where = append(where, filters)
-        }
-    }
+        builder.LeftJoin(last_part.Field.FieldCollection + " " + new_table_name, join_on_sb.String())
 
-    return
+		filters := used_collections_filters[last_part.Field.FieldCollection]
+        filters = strings.ReplaceAll(filters, last_part.Field.FieldCollection, new_table_name)
+        builder.Where(filters)
+        
+		for _, exp := range v {
+            last_part = exp.Fields[len(exp.Fields)-1]
+
+            builder.Select(new_table_name+"."+last_part.Field.FieldName)
+		}
+
+	}
+
+	return
 }
 
 // collection = Posts
 // fields = [title]
 // expanded = [Posts.user.name]
 
-// SELECT Posts.title, Users.Name FROM Posts 
+// SELECT Posts.title, Users.Name FROM Posts
 //  LEFT JOIN Users
 //  ON Users.id = (SELECT id FROM Users WHERE id = Posts.user AND ...)
