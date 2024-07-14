@@ -138,9 +138,9 @@ func (this *Analyzer) AnalyzeVariableParts(my_collection_name string, token_as_v
 				}
 
                 token_as_variable.Fields[i-1].PartType = querylang_types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_TYPE
-                token_as_variable.Fields[i-1].Collection = struct{CollectionName string;FkToLastPartName string}{
+                token_as_variable.Fields[i-1].Collection = struct{CollectionName string;FkToLastPartField types.TableField}{
                     CollectionName: curr_collection.Name,
-                    FkToLastPartName: relation.FieldName,
+                    FkToLastPartField: relation,
                 }
 
 

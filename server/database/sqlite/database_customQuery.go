@@ -168,7 +168,7 @@ func createExpandedSelect(token_as_variable *querylang_types.TokenValueVariable,
 	curr_part := token_as_variable.Fields[last_index-1]
 	closingParenthesseis := " LIMIT 1)"
 	if curr_part.PartType == querylang_types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_TYPE {
-		sb.WriteString(curr_part.Collection.FkToLastPartName)
+		sb.WriteString(curr_part.Collection.FkToLastPartField.FieldName)
 		sb.WriteString(" = ")
 		startIndex--
 		closingParenthesseis = ")"
@@ -193,20 +193,39 @@ func createExpandedSelect(token_as_variable *querylang_types.TokenValueVariable,
 
 	curr_part = token_as_variable.Fields[0]
 	curr_field = curr_part.Field
-	filters = used_collections_filters[curr_field.FkRefersToCollection]
-	has_filters := filters != ""
-	if has_filters {
-		sb.WriteString("(SELECT id FROM ")
-		sb.WriteString(curr_field.FieldCollection)
-		sb.WriteString(" WHERE ")
-		sb.WriteString(filters)
-		sb.WriteString(" AND ")
-		sb.WriteString("id =  ")
-		startIndex++
-	}
-	sb.WriteString(curr_part.Field.FieldCollection)
-	sb.WriteString(".")
-	sb.WriteString(curr_part.Field.FieldName)
+	if curr_part.PartType == querylang_types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_TYPE {
+        refers_to_collection := curr_part.Collection.FkToLastPartField.FkRefersToTable.String
+        filters = used_collections_filters[refers_to_collection]
+        has_filters := filters != ""
+        if has_filters {
+            sb.WriteString("(SELECT id FROM ")
+            sb.WriteString(curr_field.FieldCollection)
+            sb.WriteString(" WHERE ")
+            sb.WriteString(filters)
+            sb.WriteString(" AND ")
+            sb.WriteString("id =  ")
+            startIndex += 2
+        }
+        sb.WriteString(refers_to_collection)
+        sb.WriteString(".id")
+    } else {
+        filters = used_collections_filters[curr_field.FkRefersToCollection]
+        has_filters := filters != ""
+        if has_filters {
+            sb.WriteString("(SELECT id FROM ")
+            sb.WriteString(curr_field.FieldCollection)
+            sb.WriteString(" WHERE ")
+            sb.WriteString(filters)
+            sb.WriteString(" AND ")
+            sb.WriteString("id =  ")
+            startIndex++
+        }
+
+        sb.WriteString(curr_part.Field.FieldCollection)
+        sb.WriteString(".")
+        sb.WriteString(curr_part.Field.FieldName)
+    }
+
 
 	for i := startIndex; i > 0; i-- {
 		sb.WriteString(" LIMIT 1)")

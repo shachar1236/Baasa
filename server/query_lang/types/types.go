@@ -88,7 +88,7 @@ type TokenValueVariablePartField struct {
 
 type TokenValueVariablePartCollection struct {
     CollectionName string
-    FkToLastPartName string
+    FkToLastPartField types.TableField
 }
 
 type TokenValueVariablePart struct {
