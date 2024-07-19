@@ -58,6 +58,7 @@ func (this *Analyzer) AnalyzeVariableParts(my_collection_name string, token_as_v
 
     is_analyzing_filter := analyze_type == querylang_types.ANALYZE_VARIABLES_PARTS_ANALYZE_TYPE_FILTER
     is_analyzing_join := analyze_type == querylang_types.ANALYZE_VARIABLES_PARTS_ANALYZE_TYPE_JOIN
+    backward_expand_occured := false
 
 	// its nested collections
 	my_collection, err := this.db.GetCollectionByName(context.Background(), variable_parts[0])
@@ -113,7 +114,7 @@ func (this *Analyzer) AnalyzeVariableParts(my_collection_name string, token_as_v
 			}
 		} else {
 			// maybe its a list
-			if i == len(variable_parts)-2 {
+			if i == len(variable_parts)-2 || (is_analyzing_join && !backward_expand_occured) {
 				curr_collection, err := this.db.GetCollectionByName(context.Background(), variable_parts[i])
 				if err != nil {
 					valid = false
