@@ -126,6 +126,9 @@ func (db *SqliteDB) BuildUserCustomQuery(
 
 	// adding where
 	sql_query = sql_query.Where(where_query)
+    
+    // sort_by
+    addSortBy(sql_query, sort_by)
 
 	return sql_query.String(), nil
 }
@@ -378,6 +381,25 @@ func joinExpandedFields(analyzed_expand []querylang_types.TokenValueVariable, bu
 	}
 
 	return
+}
+
+func addSortBy(builder *sqlf.Stmt, sort_by []string) {
+    var my_sb strings.Builder
+    for i := 0; i < len(sort_by); i++ {
+        field := sort_by[i]
+        if field[0] == '-' {
+            my_sb.WriteString(field[1:])
+            my_sb.WriteString(" DESC")
+        } else if field[0] == '+' {
+            my_sb.WriteString(field[1:])
+        } else {
+            my_sb.WriteString(field)
+        }
+        if i != len(sort_by) - 1 {
+            my_sb.WriteString(",")
+        }
+    }
+    builder.OrderBy(my_sb.String())
 }
 
 // collection = Posts

@@ -176,9 +176,13 @@ func handleCollectionSearch(logger *slog.Logger, db database.Database, ar *acces
                 if field_name[0] == '+' || field_name[0] == '-' {
                     field_name = field_name[1:]
                 }
-                for _, field2 := range collection.Fields {
-                    if field_name == field2.FieldName {
-                        exists = true
+                if field_name == "id" {
+                    exists = true
+                } else {
+                    for _, field2 := range collection.Fields {
+                        if field_name == field2.FieldName {
+                            exists = true
+                        }
                     }
                 }
 
