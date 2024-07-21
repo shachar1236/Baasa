@@ -15,6 +15,7 @@ import (
 
 const SEARCH_RULES_FILENAME = "search.lua"
 const BASE_LIMIT = 1000
+const MAX_LIMIT = 10000
 
 func addRoutes(mux *http.ServeMux, logger *slog.Logger, db database.Database, access_rules *access_rules.AccessRules, query_lang_analyzer *querylang.Analyzer) {
 	mux.Handle("/query", handleQuery(logger, db, access_rules))
@@ -113,19 +114,21 @@ func handleQuery(logger *slog.Logger, db database.Database, ar *access_rules.Acc
 	)
 }
 
+
 func handleCollectionSearch(logger *slog.Logger, db database.Database, ar *access_rules.AccessRules, query_lang_anayzer *querylang.Analyzer) http.Handler {
+    // TODO: return better errors to user
+
+    // TODO: validate each field in the message to see if there is an sql injection in it.
     type SearchMessage struct {
         CollectionName string `json:"CollectionName"`
         Session string `json:"Session"`
         Fields []string `json:"Fields"`
         Filter string `json:"Filter"`
-        SortBy string `json:"SortBy"`
+        SortBy []string `json:"SortBy"`
         Expand []string `json:"Expand"`
         Limit string `json:"Limit"`
         Offset string `json:"Offset"`
     }
-
-    // TODO: validate each field in the message to see if there is an sql injection in it.
 
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -152,7 +155,78 @@ func handleCollectionSearch(logger *slog.Logger, db database.Database, ar *acces
 				user.Username = ""
 			}
 
+            // checking if fields exists
+            for _, field_name := range msg.Fields {
+                exists := false
+                for _, field2 := range collection.Fields {
+                    if field_name == field2.FieldName {
+                        exists = true
+                    }
+                }
+
+                if !exists {
+                    w.WriteHeader(http.StatusBadRequest)
+                    return
+                }
+            }
+
+            // checks if SortBy valid
+            for _, field_name := range msg.SortBy {
+                exists := false
+                if field_name[0] == '+' || field_name[0] == '-' {
+                    field_name = field_name[1:]
+                }
+                for _, field2 := range collection.Fields {
+                    if field_name == field2.FieldName {
+                        exists = true
+                    }
+                }
+
+                if !exists {
+                    w.WriteHeader(http.StatusBadRequest)
+                    return
+                }
+            }
+
+            // checks if limit is valid
+            msg_limit := BASE_LIMIT
+            if msg.Limit != "" {
+                msg_limit, err = strconv.Atoi(msg.Limit)
+
+                if err != nil {
+                    logger.Error("Cannot convert limit to int: " + err.Error())
+                    w.WriteHeader(http.StatusBadRequest)
+                    return
+                }
+
+                if msg_limit > MAX_LIMIT {
+                    msg_limit = MAX_LIMIT
+                }
+
+                if msg_limit == 0 {
+                    msg_limit = BASE_LIMIT
+                }
+            }
+
+            // checks if offset is valid
+            msg_offset := 0
+            if msg.Offset != "" {
+                msg_offset, err = strconv.Atoi(msg.Offset)
+
+                if err != nil {
+                    logger.Error("Cannot convert offset to int: " + err.Error())
+                    w.WriteHeader(http.StatusBadRequest)
+                    return
+                }
+
+                if msg_offset >= msg_limit {
+                    w.WriteHeader(http.StatusBadRequest)
+                    return
+                }
+            }
+
 			// check if query is by the rules
+
             request, err := createRequestObject(r, user)
             if err != nil {
                 logger.Error("Cannot create request object: " + err.Error())
@@ -210,7 +284,7 @@ func handleCollectionSearch(logger *slog.Logger, db database.Database, ar *acces
                     }
 
                     // running query
-                    db.RunUserCustomQuery(msg.CollectionName, msg.Fields, tokens, msg.SortBy, analyzed_expand, used_collections_filters)
+                    db.RunUserCustomQuery(msg.CollectionName, msg.Fields, tokens, msg.SortBy, analyzed_expand, msg_limit, msg_offset, used_collections_filters)
                 }
 			}
         },

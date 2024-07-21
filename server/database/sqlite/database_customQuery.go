@@ -17,8 +17,10 @@ func (db *SqliteDB) BuildUserCustomQuery(
 	collection_name string,
 	fields []string,
 	filter_tokens []querylang_types.Token,
-	sort_by string,
+	sort_by []string,
 	analyzed_expand []querylang_types.TokenValueVariable,
+    limit int,
+    offset int,
 	used_collections_filters map[string]string,
 ) (where_query string, err error) {
 
@@ -133,11 +135,13 @@ func (db *SqliteDB) RunUserCustomQuery(
 	collection_name string,
 	fields []string,
 	filter_tokens []querylang_types.Token,
-	sort_by string,
+	sort_by []string,
 	analyzed_expand []querylang_types.TokenValueVariable,
+    limit int,
+    offset int,
 	used_collections_filters map[string]string, // map[collection_name]filters
 ) (resJson string, err error) {
-	query, err := db.BuildUserCustomQuery(collection_name, fields, filter_tokens, sort_by, analyzed_expand, used_collections_filters)
+	query, err := db.BuildUserCustomQuery(collection_name, fields, filter_tokens, sort_by, analyzed_expand, limit, offset, used_collections_filters)
 	if err != nil {
 		db.logger.Error("Error in user custom query: " + err.Error())
 		return

@@ -117,7 +117,6 @@ UPDATE table_fields SET is_foreign_key = true, field_type = ?, fk_refers_to_tabl
 -- name: ChangeFieldToNotBeForeignKey :exec
 UPDATE table_fields SET is_foreign_key = false, fk_refers_to_table = null WHERE id = ?;
 
-
 -- name: DeleteField :exec
 DELETE FROM table_fields
 WHERE id = ?;
