@@ -126,8 +126,8 @@ func handleCollectionSearch(logger *slog.Logger, db database.Database, ar *acces
         Filter string `json:"Filter"`
         SortBy []string `json:"SortBy"`
         Expand []string `json:"Expand"`
-        Limit string `json:"Limit"`
-        Offset string `json:"Offset"`
+        Limit int `json:"Limit"`
+        Offset int `json:"Offset"`
     }
 
 	return http.HandlerFunc(
@@ -193,40 +193,26 @@ func handleCollectionSearch(logger *slog.Logger, db database.Database, ar *acces
             }
 
             // checks if limit is valid
-            msg_limit := BASE_LIMIT
-            if msg.Limit != "" {
-                msg_limit, err = strconv.Atoi(msg.Limit)
+            msg_limit := msg.Limit
 
-                if err != nil {
-                    logger.Error("Cannot convert limit to int: " + err.Error())
-                    w.WriteHeader(http.StatusBadRequest)
-                    return
-                }
+            if msg_limit < 1 {
+                msg_limit = BASE_LIMIT
+            }
 
-                if msg_limit > MAX_LIMIT {
-                    msg_limit = MAX_LIMIT
-                }
+            if msg_limit > MAX_LIMIT {
+                msg_limit = MAX_LIMIT
+            }
 
-                if msg_limit == 0 {
-                    msg_limit = BASE_LIMIT
-                }
+            if msg_limit == 0 {
+                msg_limit = BASE_LIMIT
             }
 
             // checks if offset is valid
-            msg_offset := 0
-            if msg.Offset != "" {
-                msg_offset, err = strconv.Atoi(msg.Offset)
+            msg_offset := msg.Offset
 
-                if err != nil {
-                    logger.Error("Cannot convert offset to int: " + err.Error())
-                    w.WriteHeader(http.StatusBadRequest)
-                    return
-                }
-
-                if msg_offset >= msg_limit {
-                    w.WriteHeader(http.StatusBadRequest)
-                    return
-                }
+            if msg_offset >= msg_limit {
+                w.WriteHeader(http.StatusBadRequest)
+                return
             }
 
 			// check if query is by the rules

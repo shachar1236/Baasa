@@ -128,9 +128,19 @@ func (db *SqliteDB) BuildUserCustomQuery(
 	sql_query = sql_query.Where(where_query)
     
     // sort_by
-    addSortBy(sql_query, sort_by)
+    if len(sort_by) > 0 {
+        addSortBy(sql_query, sort_by)
+    }
 
-	return sql_query.String(), nil
+    // limit
+    sql_query_string := sql_query.String() + " LIMIT " + fmt.Sprint(limit)
+
+    // offset
+    if offset != 0 {
+        sql_query_string += " OFFSET " + fmt.Sprint(offset)
+    }
+
+	return sql_query_string, nil
 }
 
 // build and runs user query
