@@ -10,8 +10,15 @@ import (
 	"github.com/shachar1236/Baasa/utils"
 )
 
-var sb = strings.Builder{}
-var sb_mutex = sync.Mutex{}
+// var sb = strings.Builder{}
+// var sb_mutex = sync.Mutex{}
+var sb_pool = sync.Pool{
+    New: func() any {
+        var sb strings.Builder
+        return sb
+    },
+}
+
 
 func (db *SqliteDB) BuildUserCustomQuery(
 	collection_name string,
@@ -24,8 +31,10 @@ func (db *SqliteDB) BuildUserCustomQuery(
 	used_collections_filters map[string]string,
 ) (where_query string, err error) {
 
-	sb_mutex.Lock()
-	defer sb_mutex.Unlock()
+	// sb_mutex.Lock()
+	// defer sb_mutex.Unlock()
+    sb := sb_pool.Get().(strings.Builder)
+    defer sb_pool.Put(sb)
 	defer sb.Reset()
 
 	for _, token := range filter_tokens {
@@ -165,6 +174,14 @@ func (db *SqliteDB) RunUserCustomQuery(
 	fmt.Println(query)
 	fmt.Println()
 	fmt.Println()
+
+    rows, err := db.db.Queryx(query)
+    if err != nil {
+        db.logger.Error("Error in user custom query: " + err.Error())
+        return
+    }
+    defer rows.Close()
+
 	return
 }
 
