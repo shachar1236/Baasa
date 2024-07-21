@@ -7,6 +7,7 @@ import (
 
 	"github.com/leporo/sqlf"
 	querylang_types "github.com/shachar1236/Baasa/query_lang/types"
+	"github.com/shachar1236/Baasa/utils"
 )
 
 var sb = strings.Builder{}
@@ -150,8 +151,17 @@ func (db *SqliteDB) RunUserCustomQuery(
 	return
 }
 
+var _alias_name_num = utils.ValueWithMutex[int]{ Value: 0 }
+
+func generateAliasName(collection_name string) string {
+    _alias_name_num.Lock()
+    defer _alias_name_num.Unlock()
+    _alias_name_num.Value++
+    num := _alias_name_num.Value
+    return fmt.Sprintf("%s_%d", collection_name, num)
+}
+
 func createExpandedSelect(token_as_variable *querylang_types.TokenValueVariable, sb *strings.Builder, used_collections_filters map[string]string) {
-	// TODO: add alias name for tables
 	last_index := len(token_as_variable.Fields) - 1
 	curr_field := token_as_variable.Fields[last_index].Field
 	filters := used_collections_filters[curr_field.FieldCollection]
@@ -161,13 +171,17 @@ func createExpandedSelect(token_as_variable *querylang_types.TokenValueVariable,
 		sb.WriteString(curr_field.FieldName)
 		return
 	}
+    curr_field_alias_name := generateAliasName(curr_field.FieldCollection)
 	sb.WriteString("(SELECT ")
 	sb.WriteString(curr_field.FieldName)
 	sb.WriteString(" FROM ")
 	sb.WriteString(curr_field.FieldCollection)
+	sb.WriteString(" ")
+	sb.WriteString(curr_field_alias_name)
 	sb.WriteString(" WHERE ")
 	if filters != "" {
-		sb.WriteString(filters)
+        new_filters := strings.ReplaceAll(filters, curr_field.FieldCollection, curr_field_alias_name)
+		sb.WriteString(new_filters)
 		sb.WriteString(" AND ")
 	}
 
@@ -175,27 +189,35 @@ func createExpandedSelect(token_as_variable *querylang_types.TokenValueVariable,
 	curr_part := token_as_variable.Fields[last_index-1]
 	closingParenthesseis := " LIMIT 1)"
 	if curr_part.PartType == querylang_types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_TYPE {
+        sb.WriteString(curr_field_alias_name)
+        sb.WriteString(".")
 		sb.WriteString(curr_part.Collection.FkToLastPartField.FieldName)
 		sb.WriteString(" = ")
 		startIndex--
 		closingParenthesseis = ")"
 	} else {
-		sb.WriteString("id = ")
+        sb.WriteString(curr_field_alias_name)
+		sb.WriteString(".id = ")
 	}
 
 	for i := startIndex; i > 0; i-- {
 		curr_field := token_as_variable.Fields[i].Field
+        curr_field_alias_name := generateAliasName(curr_field.FieldCollection)
 		sb.WriteString("(SELECT ")
 		sb.WriteString(curr_field.FieldName)
 		sb.WriteString(" FROM ")
-		sb.WriteString(curr_field.FieldCollection)
+        sb.WriteString(curr_field.FieldCollection)
+        sb.WriteString(" ")
+        sb.WriteString(curr_field_alias_name)
 		sb.WriteString(" WHERE ")
 		filters := used_collections_filters[curr_field.FieldCollection]
 		if filters != "" {
-			sb.WriteString(filters)
+            new_filters := strings.ReplaceAll(filters, curr_field.FieldCollection, curr_field_alias_name)
+			sb.WriteString(new_filters)
 			sb.WriteString(" AND ")
 		}
-		sb.WriteString("id =  ")
+        sb.WriteString(curr_field_alias_name)
+		sb.WriteString(".id =  ")
 	}
 
 	curr_part = token_as_variable.Fields[0]
@@ -205,12 +227,17 @@ func createExpandedSelect(token_as_variable *querylang_types.TokenValueVariable,
 		filters = used_collections_filters[refers_to_collection]
 		has_filters := filters != ""
 		if has_filters {
+            refers_to_collection_alias_name := generateAliasName(refers_to_collection)
+            new_filters := strings.ReplaceAll(filters, refers_to_collection, refers_to_collection_alias_name)
 			sb.WriteString("(SELECT id FROM ")
 			sb.WriteString(refers_to_collection)
+			sb.WriteString(" ")
+			sb.WriteString(refers_to_collection_alias_name)
 			sb.WriteString(" WHERE ")
-			sb.WriteString(filters)
+			sb.WriteString(new_filters)
 			sb.WriteString(" AND ")
-			sb.WriteString("id =  ")
+			sb.WriteString(refers_to_collection_alias_name)
+			sb.WriteString(".id =  ")
 			startIndex += 2
 		}
 		sb.WriteString(refers_to_collection)
@@ -219,12 +246,17 @@ func createExpandedSelect(token_as_variable *querylang_types.TokenValueVariable,
 		filters = used_collections_filters[curr_field.FkRefersToCollection]
 		has_filters := filters != ""
 		if has_filters {
+            curr_field_alias_name := generateAliasName(curr_field.FkRefersToCollection)
 			sb.WriteString("(SELECT id FROM ")
-			sb.WriteString(curr_field.FieldCollection)
+			sb.WriteString(curr_field.FkRefersToCollection)
+            sb.WriteString(" ")
+            sb.WriteString(curr_field_alias_name)
 			sb.WriteString(" WHERE ")
-			sb.WriteString(filters)
+            new_filters := strings.ReplaceAll(filters, curr_field.FkRefersToCollection, curr_field_alias_name)
+			sb.WriteString(new_filters)
 			sb.WriteString(" AND ")
-			sb.WriteString("id =  ")
+            sb.WriteString(curr_field_alias_name)
+			sb.WriteString(".id =  ")
 			startIndex++
 		}
 
