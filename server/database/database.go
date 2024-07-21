@@ -17,7 +17,7 @@ type Database interface {
     SaveCollectionChanges(ctx context.Context, new_collection types.Collection) error
 
     // build and runs user query
-    RunUserCustomQuery(collection_name string, fields []string, filter_tokens []querylang_types.Token, sort_by []string, analyzed_expand []querylang_types.TokenValueVariable, limit int, offset int, used_collections_filters map[string]string) (resJson string, err error)
+    RunUserCustomQuery(collection_name string, fields []string, filter_tokens []querylang_types.Token, sort_by []string, analyzed_expand []querylang_types.TokenValueVariable, limit int, offset int, used_collections_filters map[string]string) (resJson []byte, err error)
 
     GetQuaries(ctx context.Context) ([]types.Query, error)
     GetQuaryById(ctx context.Context, query_id int64) (types.Query, error)

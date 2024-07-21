@@ -1,2 +1,3 @@
 Accept = true
-Filters = "MyUsers.name != 'shalev'"
+-- Filters = "MyUsers.name != 'shalev'"
+Filters = "1 = 1"

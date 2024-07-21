@@ -106,8 +106,8 @@ func handleQuery(logger *slog.Logger, db database.Database, ar *access_rules.Acc
 					return
 				}
 
-				w.WriteHeader(http.StatusOK)
 				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
 				w.Write(resJson)
 			}
 		},
@@ -158,9 +158,14 @@ func handleCollectionSearch(logger *slog.Logger, db database.Database, ar *acces
             // checking if fields exists
             for _, field_name := range msg.Fields {
                 exists := false
-                for _, field2 := range collection.Fields {
-                    if field_name == field2.FieldName {
-                        exists = true
+                if field_name == "id" {
+                    exists = true
+                } else {
+                    for _, field2 := range collection.Fields {
+                        if field_name == field2.FieldName {
+                            exists = true
+                            break
+                        }
                     }
                 }
 
@@ -274,7 +279,18 @@ func handleCollectionSearch(logger *slog.Logger, db database.Database, ar *acces
                     }
 
                     // running query
-                    db.RunUserCustomQuery(msg.CollectionName, msg.Fields, tokens, msg.SortBy, analyzed_expand, msg_limit, msg_offset, used_collections_filters)
+                    resJson, err := db.RunUserCustomQuery(msg.CollectionName, msg.Fields, tokens, msg.SortBy, analyzed_expand, msg_limit, msg_offset, used_collections_filters)
+
+                    if err != nil {
+                        logger.Error("Cannot run query: " + err.Error())
+                        http.Error(w, "An error occured", http.StatusInternalServerError)
+                        return
+                    }
+
+                    
+                    w.Header().Set("Content-Type", "application/json")
+                    w.WriteHeader(http.StatusOK)
+                    w.Write(resJson)
                 }
 			}
         },

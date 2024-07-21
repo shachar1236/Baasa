@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -121,7 +122,10 @@ func (db *SqliteDB) BuildUserCustomQuery(
 	where_query = sb.String()
 	sb.Reset()
 
-	sql_query := sqlf.Select(strings.Join(fields, ",")).From(collection_name)
+	sql_query := sqlf.From(collection_name)
+    for _, field := range fields {
+        sql_query.Select(collection_name + "." + field)
+    }
 
 	err = joinExpandedFields(analyzed_expand, sql_query, used_collections_filters)
 	if err != nil {
@@ -162,7 +166,7 @@ func (db *SqliteDB) RunUserCustomQuery(
     limit int,
     offset int,
 	used_collections_filters map[string]string, // map[collection_name]filters
-) (resJson string, err error) {
+) (resJson []byte, err error) {
 	query, err := db.BuildUserCustomQuery(collection_name, fields, filter_tokens, sort_by, analyzed_expand, limit, offset, used_collections_filters)
 	if err != nil {
 		db.logger.Error("Error in user custom query: " + err.Error())
@@ -181,8 +185,21 @@ func (db *SqliteDB) RunUserCustomQuery(
         return
     }
     defer rows.Close()
+    var results []map[string]any
 
-	return
+    for rows.Next() {
+        res := make(map[string]interface{})
+        err := rows.MapScan(res)
+        if err != nil {
+            db.logger.Error("Cannot run query: " + err.Error())
+            return nil, err
+        }
+        results = append(results, res)
+    }
+
+    resJsonBytes, err := json.Marshal(results)
+    resJson = resJsonBytes
+    return
 }
 
 var _alias_name_num = utils.ValueWithMutex[int]{ Value: 0 }
@@ -320,8 +337,6 @@ func joinExpandedFields(analyzed_expand []querylang_types.TokenValueVariable, bu
 		}
 	}
 
-	join_left := true
-
 	for k, v := range collections {
 		exp := v[0]
 		new_table_name := strings.ReplaceAll(k, ".", "_")
@@ -338,7 +353,6 @@ func joinExpandedFields(analyzed_expand []querylang_types.TokenValueVariable, bu
 				for i, field := range exp.Fields {
 					if field.PartType == querylang_types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_TYPE {
 						field_collection_index = i
-						join_left = false
 						break
 					}
 				}
@@ -372,7 +386,6 @@ func joinExpandedFields(analyzed_expand []querylang_types.TokenValueVariable, bu
 				createExpandedSelect(&select_token, &join_on_sb, used_collections_filters)
 			} else { // len(exp.Fields) == 2
 				if first_part.PartType == querylang_types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_TYPE {
-					join_left = false
 					join_on_sb.WriteString(new_table_name)
 					join_on_sb.WriteString(".")
 					join_on_sb.WriteString(first_part.Collection.FkToLastPartField.FieldName)
@@ -389,11 +402,7 @@ func joinExpandedFields(analyzed_expand []querylang_types.TokenValueVariable, bu
 				}
 			}
 		}
-		if join_left {
-			builder.LeftJoin(last_part.Field.FieldCollection+" "+new_table_name, join_on_sb.String())
-		} else {
-			builder.RightJoin(last_part.Field.FieldCollection+" "+new_table_name, join_on_sb.String())
-		}
+        builder.LeftJoin(last_part.Field.FieldCollection+" "+new_table_name, join_on_sb.String())
 
 		filters := used_collections_filters[last_part.Field.FieldCollection]
 		filters = strings.ReplaceAll(filters, last_part.Field.FieldCollection, new_table_name)
@@ -402,7 +411,7 @@ func joinExpandedFields(analyzed_expand []querylang_types.TokenValueVariable, bu
 		for _, exp := range v {
 			last_part = exp.Fields[len(exp.Fields)-1]
 
-			builder.Select(new_table_name + "." + last_part.Field.FieldName)
+			builder.Select(new_table_name + "." + last_part.Field.FieldName + " AS " + new_table_name + "_" + last_part.Field.FieldName)
 		}
 
 	}
