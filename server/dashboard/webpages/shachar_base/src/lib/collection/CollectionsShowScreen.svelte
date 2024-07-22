@@ -93,6 +93,7 @@
     }
 
     function addRow() {
+        delete new_row["id"];
         fetch("AddWithArgs", {
             method: "POST",
             headers: {
@@ -146,7 +147,6 @@
     <hr />
     <table>
         <tr>
-            <td class="fields">ID</td>
             {#if collection.Fields != null}
                 {#each collection.Fields as _, i}
                     <td class="fields">{collection.Fields[i].FieldName}</td>
@@ -156,7 +156,6 @@
         {#if data != null}
             {#each data as _, i}
                 <tr>
-                    <td>{data[i]["id"]}</td>
                     {#if collection.Fields != null}
                         {#each collection.Fields as _, j}
                             <td
@@ -216,19 +215,23 @@
         <tr>
             {#if collection.Fields != null}
                 {#each collection.Fields as _, i}
-                    <td class="fields">{collection.Fields[i].FieldName}</td>
+                    {#if collection.Fields[i].FieldName != "id"}
+                        <td class="fields">{collection.Fields[i].FieldName}</td>
+                    {/if}
                 {/each}
             {/if}
         </tr>
         <tr>
             {#if collection.Fields != null}
                 {#each collection.Fields as _, i}
-                    <td
-                        contenteditable="true"
-                        bind:textContent={new_row[
-                            collection.Fields[i].FieldName
-                        ]}>{new_row[collection.Fields[i].FieldName]}</td
-                    >
+                    {#if collection.Fields[i].FieldName != "id"}
+                        <td
+                            contenteditable="true"
+                            bind:textContent={new_row[
+                                collection.Fields[i].FieldName
+                            ]}>{new_row[collection.Fields[i].FieldName]}</td
+                        >
+                    {/if}
                 {/each}
             {/if}
         </tr>
@@ -252,6 +255,11 @@
                 ) {
                     alert(field.FieldName + " must have a value");
                     can_save = false;
+                }
+
+                if (!new_row[field.FieldName]) {
+                    // remove field
+                    delete new_row[field.FieldName];
                 }
             });
 

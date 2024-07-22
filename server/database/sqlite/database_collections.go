@@ -210,7 +210,7 @@ func getAddTableQueryForCollection(ctx context.Context, collection types.Collect
 	var sb strings.Builder
 	sb.WriteString("CREATE TABLE IF NOT EXISTS ")
 	sb.WriteString(collection.Name)
-	sb.WriteString("\n(id INTEGER PRIMARY KEY,\n")
+	sb.WriteString("\n(\n")
 
 	var fks []types.TableField
 
@@ -436,6 +436,9 @@ func (this *SqliteDB) SaveCollectionChanges(ctx context.Context, new_collection 
 		}
 
 		if !fields_exists {
+            if old_field.IsLocked {
+                return errors.New("Cant delete locked field")
+            }
 			needs_to_create_new = true
 			needs_to_copy = true
 
