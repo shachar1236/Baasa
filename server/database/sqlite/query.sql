@@ -93,8 +93,8 @@ INSERT INTO collections (table_name)
 VALUES (?) RETURNING *;
 
 -- name: CreateField :exec
-INSERT INTO table_fields (field_name, field_type, field_options, collection_id, is_foreign_key, fk_refers_to_table)
-VALUES (?, ?, ?, ?, ?, ?);
+INSERT INTO table_fields (field_name, field_type, field_options, collection_id, is_locked, is_foreign_key, fk_refers_to_table)
+VALUES (?, ?, ?, ?, ?, ?, ?);
 
 -- name: DeleteCollection :exec
 DELETE FROM collections WHERE table_name = ?;
@@ -103,20 +103,20 @@ DELETE FROM collections WHERE table_name = ?;
 UPDATE collections SET table_name = sqlc.arg(new_name) WHERE table_name = sqlc.arg(old_name);
 
 -- name: ChangeFieldName :exec
-UPDATE table_fields SET field_name = ? WHERE id = ?;
+UPDATE table_fields SET field_name = ? WHERE id = ? AND is_locked = FALSE;
 
 -- name: ChangeFieldType :exec
-UPDATE table_fields SET field_type = ? WHERE id = ?;
+UPDATE table_fields SET field_type = ? WHERE id = ? AND is_locked = FALSE;
 
 -- name: ChangeFieldOptions :exec
-UPDATE table_fields SET field_options = ? WHERE id = ?;
+UPDATE table_fields SET field_options = ? WHERE id = ? AND is_locked = FALSE;
 
 -- name: ChangeFieldToForeignKey :exec
-UPDATE table_fields SET is_foreign_key = true, field_type = ?, fk_refers_to_table  = ? WHERE id = ?;
+UPDATE table_fields SET is_foreign_key = true, field_type = ?, fk_refers_to_table  = ? WHERE id = ? AND is_locked = FALSE;
 
 -- name: ChangeFieldToNotBeForeignKey :exec
-UPDATE table_fields SET is_foreign_key = false, fk_refers_to_table = null WHERE id = ?;
+UPDATE table_fields SET is_foreign_key = false, fk_refers_to_table = null WHERE id = ? AND is_locked = FALSE;
 
 -- name: DeleteField :exec
 DELETE FROM table_fields
-WHERE id = ?;
+WHERE id = ? AND is_locked = FALSE;

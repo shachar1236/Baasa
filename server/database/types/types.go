@@ -18,6 +18,7 @@ type TableField struct {
 	FieldName       string
 	FieldType       string
 	FieldOptions    NullString
+	IsLocked        bool
 	IsForeignKey    bool
 	FkRefersToTable NullString
 }

@@ -11,7 +11,7 @@ import (
 )
 
 const changeFieldName = `-- name: ChangeFieldName :exec
-UPDATE table_fields SET field_name = ? WHERE id = ?
+UPDATE table_fields SET field_name = ? WHERE id = ? AND is_locked = FALSE
 `
 
 type ChangeFieldNameParams struct {
@@ -25,7 +25,7 @@ func (q *Queries) ChangeFieldName(ctx context.Context, arg ChangeFieldNameParams
 }
 
 const changeFieldOptions = `-- name: ChangeFieldOptions :exec
-UPDATE table_fields SET field_options = ? WHERE id = ?
+UPDATE table_fields SET field_options = ? WHERE id = ? AND is_locked = FALSE
 `
 
 type ChangeFieldOptionsParams struct {
@@ -39,7 +39,7 @@ func (q *Queries) ChangeFieldOptions(ctx context.Context, arg ChangeFieldOptions
 }
 
 const changeFieldToForeignKey = `-- name: ChangeFieldToForeignKey :exec
-UPDATE table_fields SET is_foreign_key = true, field_type = ?, fk_refers_to_table  = ? WHERE id = ?
+UPDATE table_fields SET is_foreign_key = true, field_type = ?, fk_refers_to_table  = ? WHERE id = ? AND is_locked = FALSE
 `
 
 type ChangeFieldToForeignKeyParams struct {
@@ -54,7 +54,7 @@ func (q *Queries) ChangeFieldToForeignKey(ctx context.Context, arg ChangeFieldTo
 }
 
 const changeFieldToNotBeForeignKey = `-- name: ChangeFieldToNotBeForeignKey :exec
-UPDATE table_fields SET is_foreign_key = false, fk_refers_to_table = null WHERE id = ?
+UPDATE table_fields SET is_foreign_key = false, fk_refers_to_table = null WHERE id = ? AND is_locked = FALSE
 `
 
 func (q *Queries) ChangeFieldToNotBeForeignKey(ctx context.Context, id int64) error {
@@ -63,7 +63,7 @@ func (q *Queries) ChangeFieldToNotBeForeignKey(ctx context.Context, id int64) er
 }
 
 const changeFieldType = `-- name: ChangeFieldType :exec
-UPDATE table_fields SET field_type = ? WHERE id = ?
+UPDATE table_fields SET field_type = ? WHERE id = ? AND is_locked = FALSE
 `
 
 type ChangeFieldTypeParams struct {
@@ -134,8 +134,8 @@ func (q *Queries) CreateCollection(ctx context.Context, tableName string) (Colle
 }
 
 const createField = `-- name: CreateField :exec
-INSERT INTO table_fields (field_name, field_type, field_options, collection_id, is_foreign_key, fk_refers_to_table)
-VALUES (?, ?, ?, ?, ?, ?)
+INSERT INTO table_fields (field_name, field_type, field_options, collection_id, is_locked, is_foreign_key, fk_refers_to_table)
+VALUES (?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateFieldParams struct {
@@ -143,6 +143,7 @@ type CreateFieldParams struct {
 	FieldType       string
 	FieldOptions    sql.NullString
 	CollectionID    int64
+	IsLocked        bool
 	IsForeignKey    bool
 	FkRefersToTable sql.NullString
 }
@@ -153,6 +154,7 @@ func (q *Queries) CreateField(ctx context.Context, arg CreateFieldParams) error 
 		arg.FieldType,
 		arg.FieldOptions,
 		arg.CollectionID,
+		arg.IsLocked,
 		arg.IsForeignKey,
 		arg.FkRefersToTable,
 	)
@@ -203,7 +205,7 @@ func (q *Queries) DeleteCollection(ctx context.Context, tableName string) error 
 
 const deleteField = `-- name: DeleteField :exec
 DELETE FROM table_fields
-WHERE id = ?
+WHERE id = ? AND is_locked = FALSE
 `
 
 func (q *Queries) DeleteField(ctx context.Context, id int64) error {

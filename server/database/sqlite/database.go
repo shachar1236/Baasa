@@ -2,7 +2,9 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
 	_ "embed"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -24,7 +26,7 @@ type SqliteDB struct {
 	db              *sqlx.DB
 	objects_queries *objects.Queries
 
-	logger    *slog.Logger
+	logger *slog.Logger
 }
 
 func New(ctx context.Context) (SqliteDB, error) {
@@ -51,6 +53,65 @@ func New(ctx context.Context) (SqliteDB, error) {
 
 	this.db = mydb
 	this.objects_queries = objects.New(this.db)
+
+    users, err := this.GetCollectionByName(ctx, "users")
+    fmt.Printf("%+v\n", users)
+    
+	if err != nil {
+		users, err := this.objects_queries.CreateCollection(ctx, "users")
+		if err != nil {
+			return this, err
+		}
+		this.logger.Info("created users collection")
+
+		err = this.objects_queries.CreateField(ctx, objects.CreateFieldParams{
+			FieldName:    "id",
+			FieldType:    "INTEGER",
+			FieldOptions: sql.NullString{String: "PRIMARY KEY", Valid: true},
+			CollectionID: users.ID,
+			IsLocked:     true,
+		})
+
+		if err != nil {
+			return this, err
+		}
+
+		err = this.objects_queries.CreateField(ctx, objects.CreateFieldParams{
+			FieldName:    "username",
+			FieldType:    "text",
+			FieldOptions: sql.NullString{String: "NOT NULL UNIQUE", Valid: true},
+			CollectionID: users.ID,
+			IsLocked:     true,
+		})
+
+		if err != nil {
+			return this, err
+		}
+
+		err = this.objects_queries.CreateField(ctx, objects.CreateFieldParams{
+			FieldName:    "password_hash",
+			FieldType:    "BLOB(32)",
+			FieldOptions: sql.NullString{String: "NOT NULL CHECK(length(password_hash) = 32)", Valid: true},
+			CollectionID: users.ID,
+			IsLocked:     true,
+		})
+
+		if err != nil {
+			return this, err
+		}
+
+		err = this.objects_queries.CreateField(ctx, objects.CreateFieldParams{
+			FieldName:    "session",
+			FieldType:    "text",
+			FieldOptions: sql.NullString{String: "NOT NULL UNIQUE", Valid: true},
+			CollectionID: users.ID,
+			IsLocked:     true,
+		})
+
+		if err != nil {
+			return this, err
+		}
+	}
 
 	return this, nil
 }

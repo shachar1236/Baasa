@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS table_fields (
     field_type text NOT NULL,
     field_options text,
 
-    is_locked bool NOT NULL DEFAULT FALSE
+    is_locked bool NOT NULL DEFAULT FALSE,
 
     is_foreign_key boolean NOT NULL DEFAULT FALSE,
     fk_refers_to_table text,

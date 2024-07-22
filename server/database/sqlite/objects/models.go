@@ -27,6 +27,7 @@ type TableField struct {
 	FieldName       string
 	FieldType       string
 	FieldOptions    sql.NullString
+	IsLocked        bool
 	IsForeignKey    bool
 	FkRefersToTable sql.NullString
 }

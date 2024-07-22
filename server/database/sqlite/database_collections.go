@@ -40,7 +40,9 @@ func (this *SqliteDB) GetCollectionByName(ctx context.Context, name string) (typ
 				collection.Fields = append(collection.Fields, field)
 			}
 		}
-	}
+    } else {
+        return collection, errors.New("collection not found")
+    }
 	return collection, err
 }
 
@@ -74,7 +76,9 @@ func (this *SqliteDB) GetCollectionById(ctx context.Context, id int64) (types.Co
 				collection.Fields = append(collection.Fields, field)
 			}
 		}
-	}
+	} else {
+        return collection, errors.New("collection not found")
+    }
 	return collection, err
 }
 
@@ -145,6 +149,21 @@ func (this *SqliteDB) AddCollection(ctx context.Context) (types.Collection, erro
 	collection.ID = res.ID
 	collection.Name = res.TableName
 	collection.QueryRulesDirectoryPath = res.QueryRulesDirectoryPath
+
+    // creating id field
+    field_id := objects.CreateFieldParams{
+        FieldName: "id",
+        FieldType: "INTEGER",
+        FieldOptions: sql.NullString{String: "PRIMARY KEY", Valid: true},
+        CollectionID: res.ID,
+        IsLocked: true,
+    }
+    
+    err = this.objects_queries.CreateField(ctx, field_id)
+	if err != nil {
+		this.logger.Error("Cant add collection: " + err.Error())
+		return collection, err
+	}
 	return collection, err
 }
 
@@ -283,6 +302,12 @@ func (this *SqliteDB) SaveCollectionChanges(ctx context.Context, new_collection 
 
 			if new_field.ID == old_field.ID {
 				field_exists = true
+
+                if old_field.IsLocked {
+                    err = errors.New("Cant change field name: " + err.Error())
+                    logger.Error(err.Error())
+                    return err
+                }
 
 				if new_field.FieldName != old_collection.Name {
 					err = this.ChangeFieldName(ctx, new_collection.Name, old_field.FieldName, new_field.FieldName, old_field.ID)
@@ -527,16 +552,16 @@ func (this *SqliteDB) ChangeCollectionName(ctx context.Context, old_name string,
 func (this *SqliteDB) ChangeFieldName(ctx context.Context, collection_name string, old_name string, new_name string, field_id int64) error {
 	logger := this.logger.With("collection_name", collection_name, "old_name", old_name, "new_name", new_name)
 	// removing table
-	_, err := this.db.Exec("ALTER TABLE " + collection_name + " RENAME COLUMN " + old_name + " TO " + new_name + ";")
+    err := this.objects_queries.ChangeFieldName(ctx, objects.ChangeFieldNameParams{
+		FieldName: new_name,
+		ID:        field_id,
+	})
 	if err != nil {
 		logger.Error("Cant change field name: " + err.Error())
 		return err
 	}
 
-	err = this.objects_queries.ChangeFieldName(ctx, objects.ChangeFieldNameParams{
-		FieldName: new_name,
-		ID:        field_id,
-	})
+	_, err = this.db.Exec("ALTER TABLE " + collection_name + " RENAME COLUMN " + old_name + " TO " + new_name + ";")
 	if err != nil {
 		logger.Error("Cant change field name: " + err.Error())
 		return err
