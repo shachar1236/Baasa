@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -200,6 +201,7 @@ func (db *SqliteDB) RunUserCustomQuery(
     resJsonBytes, err := json.Marshal(results)
     resJson = resJsonBytes
     return
+
 }
 
 var _alias_name_num = utils.ValueWithMutex[int]{ Value: 0 }
@@ -342,7 +344,6 @@ func joinExpandedFields(analyzed_expand []querylang_types.TokenValueVariable, bu
 		new_table_name := strings.ReplaceAll(k, ".", "_")
 
 		last_part := exp.Fields[len(exp.Fields)-1]
-		fmt.Println("Len of fields: ", len(exp.Fields))
 		var join_on_sb strings.Builder
 		var select_token querylang_types.TokenValueVariable
 		if len(exp.Fields) >= 2 {
@@ -410,8 +411,19 @@ func joinExpandedFields(analyzed_expand []querylang_types.TokenValueVariable, bu
 
 		for _, exp := range v {
 			last_part = exp.Fields[len(exp.Fields)-1]
-
-			builder.Select(new_table_name + "." + last_part.Field.FieldName + " AS " + new_table_name + "_" + last_part.Field.FieldName)
+            if last_part.Field.FieldName[len(last_part.Field.FieldName) - 1] == '*' {
+                collection := last_part.Field.FieldCollectionPointer
+                if collection == nil {
+                    return errors.New("Field Dosent have collection")
+                }
+                as_value_start := new_table_name + "_"
+                for _, field := range collection.Fields {
+                    builder.Select(new_table_name + "." + field.FieldName + " AS " +  as_value_start + field.FieldName)
+                }
+            } else {
+                table_and_field_name := new_table_name + "." + last_part.Field.FieldName
+                builder.Select(table_and_field_name + " AS " + new_table_name + "_" + last_part.Field.FieldName)
+            }
 		}
 
 	}

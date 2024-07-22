@@ -23,6 +23,11 @@ func (set *CollectionsSet) GetMap() map[string]types.Collection {
 	return set.collections
 }
 
+func (set *CollectionsSet) GetCollectionByName(name string) (collection types.Collection, exists bool) {
+    c, exists := set.collections[name]
+    return c, exists
+}
+
 func (set *CollectionsSet) Union(added_collection_set CollectionsSet) {
 	for k, v := range added_collection_set.collections {
 		set.collections[k] = v
@@ -82,6 +87,7 @@ const (
 type TokenValueVariablePartField struct {
     FieldName string
     FieldCollection string
+    FieldCollectionPointer *types.Collection
     // if field not fk then fk = ""
     FkRefersToCollection string
 }

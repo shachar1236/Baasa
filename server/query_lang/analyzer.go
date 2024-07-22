@@ -97,14 +97,18 @@ func (this *Analyzer) AnalyzeVariableParts(my_collection_name string, token_as_v
 
 			if my_field.IsForeignKey {
 				curr_collection_name := my_field.FkRefersToTable.String
-				curr_collection, err := this.db.GetCollectionByName(context.Background(), curr_collection_name)
-				if err != nil {
-					valid = false
-					this.logger.Error("Cannot get collection: " + err.Error())
-					return
-				}
+                curr_collection, exists := used_collections.GetCollectionByName(curr_collection_name)
+                if !exists {
+                    curr_collection, err = this.db.GetCollectionByName(context.Background(), curr_collection_name)
+                    if err != nil {
+                        valid = false
+                        this.logger.Error("Cannot get collection: " + err.Error())
+                        return
+                    }
+                }
 
                 token_as_variable.Fields[i-1].Field.FkRefersToCollection = curr_collection_name
+                token_as_variable.Fields[i-1].Field.FieldCollectionPointer = &curr_collection
 
 				last_collection = curr_collection
 				used_collections.Add(curr_collection)
@@ -115,12 +119,15 @@ func (this *Analyzer) AnalyzeVariableParts(my_collection_name string, token_as_v
 		} else {
 			// maybe its a list
 			if i == len(variable_parts)-2 || (is_analyzing_join && !backward_expand_occured) {
-				curr_collection, err := this.db.GetCollectionByName(context.Background(), variable_parts[i])
-				if err != nil {
-					valid = false
-					this.logger.Error("Cannot get collection: " + err.Error())
-					return
-				}
+                curr_collection, exists := used_collections.GetCollectionByName(variable_parts[i])
+                if !exists {
+                    curr_collection, err = this.db.GetCollectionByName(context.Background(), variable_parts[i])
+                    if err != nil {
+                        valid = false
+                        this.logger.Error("Cannot get collection: " + err.Error())
+                        return
+                    }
+                }
 
 				// checking if collection has relation to last collection
 				has_relation := false
@@ -172,6 +179,7 @@ func (this *Analyzer) AnalyzeVariableParts(my_collection_name string, token_as_v
         FieldName: variable_parts[len(variable_parts) - 1],
         FieldCollection: last_collection.Name,
     }
+    token_as_variable.Fields[last_index].Field.FieldCollectionPointer = &last_collection
 
 
 	valid = true
