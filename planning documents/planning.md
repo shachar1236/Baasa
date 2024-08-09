@@ -11,11 +11,11 @@ The admin can create and edit new queris - which a basicly a custom query from t
 Each query have access rules which is basicly the rules of who can call the query, the admin can edit the access rules from the dashboard.
 The clients can access each collection in 5 different methods and each method has its own custom access rules.
 The methods are:
-    - Search - searching in the collection with custom filters.
-    - View - getting a singe record from the collection by searching with custom filters.
-    - Create - creating a new record in the collection.
-    - Update - updating a record in the collection by searching with custom filters.
-    - Delete - updating a record in the collection by searching with custom filters.
+- Search - searching in the collection with custom filters.
+- View - getting a singe record from the collection by searching with custom filters.
+- Create - creating a new record in the collection.
+- Update - updating a record in the collection by searching with custom filters.
+- Delete - updating a record in the collection by searching with custom filters.
 
 In the database there would be a 'users' collection which would hold all the information of the users.
 The client can register and login to server.
@@ -31,5 +31,15 @@ Having SDK in other programing languages aside from js.
 
 ## When will the project will be complete?
 When the MVP will be complete.
+
+---
+# Project components
+- Admin dashboard
+- Database
+- User authentication.
+- Client API.
+- Access Rules to the database.
+---
+# Project features
 
 ---
