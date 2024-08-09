@@ -36,10 +36,39 @@ When the MVP will be complete.
 # Project components
 - Admin dashboard
 - Database
-- User authentication.
 - Client API.
 - Access Rules to the database.
+- User authentication.
 ---
 # Project features
-
+## Admin dashboard
+1. Show collections.
+2. Creating new collection.
+3. Changing collection properties.
+4. Deleting collection.
+5. Show collection records.
+6. Edit collection record.
+7. Creating new record in collection.
+8. Edit collection access rules for each of the 5 access methods.
+9. Show custom queris.
+10. Creating new custom query.
+11. Editing query.
+12. Deleting query.
+13. Editing query access rules.
+## Database
+1. Create user.
+2. Get user/s.
+3. Update user.
+4. Delete user.
+5. Create collection.
+6. Get collection/s.
+7. Update collection.
+8. Delete collection.
+9. Create query.
+10. Get query.
+11. Update query.
+12. Delete query.
+13. Query custom query.
+14. Search in database with custom filters. (Same as Client API #_)
+15. 
 ---
