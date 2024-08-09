@@ -282,6 +282,43 @@ func (q *Queries) GetAllTablesAndFields(ctx context.Context) ([]GetAllTablesAndF
 	return items, nil
 }
 
+const getCollectionsWithForeignKeyTo = `-- name: GetCollectionsWithForeignKeyTo :many
+SELECT 
+    collections.table_name 
+FROM 
+    collections 
+WHERE
+    EXISTS (SELECT 1 FROM table_fields
+        WHERE
+            table_fields.collection_id = collections.id AND
+            table_fields.is_foreign_key = TRUE AND
+            table_fields.fk_refers_to_table = ?
+    )
+`
+
+func (q *Queries) GetCollectionsWithForeignKeyTo(ctx context.Context, fkRefersToTable sql.NullString) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, getCollectionsWithForeignKeyTo, fkRefersToTable)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var table_name string
+		if err := rows.Scan(&table_name); err != nil {
+			return nil, err
+		}
+		items = append(items, table_name)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getQueries = `-- name: GetQueries :many
 SELECT id, name, "query", query_rules_file_path FROM queries
 `

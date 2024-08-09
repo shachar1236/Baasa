@@ -29,20 +29,20 @@ func (this *SqliteDB) GetCollectionByName(ctx context.Context, name string) (typ
 		for _, coll := range res {
 			if coll.FieldID.Int64 != 0 {
 				field := types.TableField{
-					ID:           coll.FieldID.Int64,
-					CollectionID: coll.CollectionID,
-					FieldName:    coll.FieldName.String,
-					FieldType:    coll.FieldType.String,
-					FieldOptions: types.NullString(coll.FieldOptions),
-                    IsForeignKey: coll.IsForeignKey.Bool,
-                    FkRefersToTable: types.NullString(coll.FkRefersToTable),
+					ID:              coll.FieldID.Int64,
+					CollectionID:    coll.CollectionID,
+					FieldName:       coll.FieldName.String,
+					FieldType:       coll.FieldType.String,
+					FieldOptions:    types.NullString(coll.FieldOptions),
+					IsForeignKey:    coll.IsForeignKey.Bool,
+					FkRefersToTable: types.NullString(coll.FkRefersToTable),
 				}
 				collection.Fields = append(collection.Fields, field)
 			}
 		}
-    } else {
-        return collection, errors.New("collection not found")
-    }
+	} else {
+		return collection, errors.New("collection not found")
+	}
 	return collection, err
 }
 
@@ -65,20 +65,20 @@ func (this *SqliteDB) GetCollectionById(ctx context.Context, id int64) (types.Co
 		for _, coll := range res {
 			if coll.FieldID.Int64 != 0 {
 				field := types.TableField{
-					ID:           coll.FieldID.Int64,
-					CollectionID: coll.CollectionID,
-					FieldName:    coll.FieldName.String,
-					FieldType:    coll.FieldType.String,
-					FieldOptions: types.NullString(coll.FieldOptions),
-                    IsForeignKey: coll.IsForeignKey.Bool,
-                    FkRefersToTable: types.NullString(coll.FkRefersToTable),
+					ID:              coll.FieldID.Int64,
+					CollectionID:    coll.CollectionID,
+					FieldName:       coll.FieldName.String,
+					FieldType:       coll.FieldType.String,
+					FieldOptions:    types.NullString(coll.FieldOptions),
+					IsForeignKey:    coll.IsForeignKey.Bool,
+					FkRefersToTable: types.NullString(coll.FkRefersToTable),
 				}
 				collection.Fields = append(collection.Fields, field)
 			}
 		}
 	} else {
-        return collection, errors.New("collection not found")
-    }
+		return collection, errors.New("collection not found")
+	}
 	return collection, err
 }
 
@@ -86,7 +86,7 @@ func (this *SqliteDB) GetCollections(ctx context.Context) ([]types.Collection, e
 	res, err := this.objects_queries.GetAllTablesAndFields(ctx)
 
 	collections := []types.Collection{}
-	this.logger.Info(fmt.Sprintf("res: %v", res))
+	// this.logger.Info(fmt.Sprintf("res: %v", res))
 	if len(res) > 0 {
 		curr_collection := types.Collection{
 			ID:                      res[0].CollectionID,
@@ -150,16 +150,16 @@ func (this *SqliteDB) AddCollection(ctx context.Context) (types.Collection, erro
 	collection.Name = res.TableName
 	collection.QueryRulesDirectoryPath = res.QueryRulesDirectoryPath
 
-    // creating id field
-    field_id := objects.CreateFieldParams{
-        FieldName: "id",
-        FieldType: "INTEGER",
-        FieldOptions: sql.NullString{String: "PRIMARY KEY", Valid: true},
-        CollectionID: res.ID,
-        IsLocked: true,
-    }
-    
-    err = this.objects_queries.CreateField(ctx, field_id)
+	// creating id field
+	field_id := objects.CreateFieldParams{
+		FieldName:    "id",
+		FieldType:    "INTEGER",
+		FieldOptions: sql.NullString{String: "PRIMARY KEY", Valid: true},
+		CollectionID: res.ID,
+		IsLocked:     true,
+	}
+
+	err = this.objects_queries.CreateField(ctx, field_id)
 	if err != nil {
 		this.logger.Error("Cant add collection: " + err.Error())
 		return collection, err
@@ -259,7 +259,7 @@ func analyze_if_fk(field_type string) (is_fk bool, fk_refers_to_table string) {
 			// inside := filed_type[3:len(filed_type) - 1]
 			// p := strings.Split(inside, ".")
 			t, _ := getTableFieldAndConstrainsFromFK(field_type)
-            fk_refers_to_table = t
+			fk_refers_to_table = t
 			is_fk = true
 			return
 		}
@@ -268,6 +268,76 @@ func analyze_if_fk(field_type string) (is_fk bool, fk_refers_to_table string) {
 	is_fk = false
 	return
 }
+
+func (this *SqliteDB) RecreateCollection(ctx context.Context, new_collection types.Collection, needs_to_copy bool, changed_fields_strings []string) error {
+	// changing table name
+	logger := this.logger.With("collection_id", new_collection.ID)
+	changed_collection_name := "old_" + new_collection.Name
+	err := this.changeCollectionTableName(ctx, new_collection.Name, changed_collection_name)
+	if err != nil {
+		err = errors.New("Cant change table name: " + err.Error())
+		logger.Error(err.Error())
+		return err
+	}
+
+	// creating new table
+	create_query := getAddTableQueryForCollection(ctx, new_collection)
+	logger.Info("new table create query: " + create_query)
+	_, err = this.db.Exec(create_query)
+	if err != nil {
+		err = errors.New("Cant create new table: " + err.Error())
+		logger.Info("new table create query: " + create_query)
+		logger.Error(err.Error())
+		// reverting table name change
+		this.changeCollectionTableName(ctx, changed_collection_name, new_collection.Name)
+		// returning error
+		return err
+	}
+
+	// copying table
+	if needs_to_copy {
+		var copy_query strings.Builder
+		copy_query.WriteString("INSERT INTO ")
+		copy_query.WriteString(new_collection.Name)
+		copy_query.WriteString(" (")
+		fields_string := strings.Join(changed_fields_strings, ", ")
+		copy_query.WriteString(fields_string)
+		copy_query.WriteString(") ")
+		copy_query.WriteString("SELECT ")
+		copy_query.WriteString(fields_string)
+		copy_query.WriteString(" FROM ")
+		copy_query.WriteString(changed_collection_name)
+		copy_query.WriteString(";")
+
+		logger.Info("copy query: " + copy_query.String())
+
+		_, err = this.db.Exec(copy_query.String())
+		if err != nil {
+			err = errors.New("Cant copy collection: " + err.Error())
+			logger.Info("copy query: " + copy_query.String())
+			logger.Error(err.Error())
+			// droping new table
+			this.dropTable(ctx, new_collection.Name)
+			// reverting table name change
+			this.changeCollectionTableName(ctx, changed_collection_name, new_collection.Name)
+			// returning error
+			return err
+		}
+
+		// changing Collection and table_fields
+	}
+
+	// droping old table
+	err = this.dropTable(ctx, changed_collection_name)
+	if err != nil {
+		err = errors.New("Cant drop old table: " + err.Error())
+		logger.Error(err.Error())
+		return err
+	}
+
+	return nil
+}
+
 func (this *SqliteDB) SaveCollectionChanges(ctx context.Context, new_collection types.Collection) error {
 	logger := this.logger.With("collection_id", new_collection.ID)
 
@@ -284,15 +354,67 @@ func (this *SqliteDB) SaveCollectionChanges(ctx context.Context, new_collection 
 			logger.Error(err.Error())
 			return err
 		}
+
+        revert := func() {
+            err = this.ChangeCollectionName(ctx, new_collection.Name, old_collection.Name)
+            if err != nil {
+                err = errors.New("Cant change collection name: " + err.Error())
+                logger.Error(err.Error())
+            }
+        }
+
+		// recreate all child tables
+		child_collections, err := this.objects_queries.GetCollectionsWithForeignKeyTo(ctx, sql.NullString{
+			Valid:  true,
+			String: old_collection.Name,
+		})
+
+		if err != nil {
+			return err
+		}
+
+		for _, collection_name := range child_collections {
+			collection, err := this.GetCollectionByName(ctx, collection_name)
+
+			if err != nil {
+                revert()
+				return err
+			}
+
+			fields_string := make([]string, len(collection.Fields))
+			for i, field := range collection.Fields {
+				fields_string[i] = field.FieldName
+				is_fk, refers_to := analyze_if_fk(field.FieldType)
+				if is_fk && refers_to == old_collection.Name {
+					collection.Fields[i].FieldType = strings.ReplaceAll(field.FieldType, old_collection.Name, new_collection.Name)
+
+                    err = this.objects_queries.ChangeFieldToForeignKey(ctx, objects.ChangeFieldToForeignKeyParams{
+                        ID: field.ID,
+                        FieldType: collection.Fields[i].FieldType,
+                        FkRefersToTable: sql.NullString{
+                            Valid: true,
+                            String: new_collection.Name,
+                        },
+                    })
+
+                    if err != nil {
+                        revert()
+                        return err
+                    }
+				}
+			}
+			err = this.RecreateCollection(ctx, collection, true, fields_string)
+			if err != nil {
+                revert()
+				return err
+			}
+
+		}
 	}
 
 	needs_to_create_new := false
 	needs_to_copy := false
-	var copy_query strings.Builder
-	copy_query.WriteString("INSERT INTO ")
-	copy_query.WriteString(new_collection.Name)
-	copy_query.WriteString(" (")
-	var new_fields_strings []string
+	var changed_fields_strings []string
 
 	var if_succeds []func()
 
@@ -303,13 +425,13 @@ func (this *SqliteDB) SaveCollectionChanges(ctx context.Context, new_collection 
 			if new_field.ID == old_field.ID {
 				field_exists = true
 
-                if old_field.IsLocked {
-                    err = errors.New("Cant change field name: " + err.Error())
-                    logger.Error(err.Error())
-                    return err
-                }
+				if old_field.IsLocked {
+					err = errors.New("Cant change field name: " + err.Error())
+					logger.Error(err.Error())
+					return err
+				}
 
-				if new_field.FieldName != old_collection.Name {
+				if new_field.FieldName != old_field.FieldName {
 					err = this.ChangeFieldName(ctx, new_collection.Name, old_field.FieldName, new_field.FieldName, old_field.ID)
 					if err != nil {
 						err = errors.New("Cant change field name: " + err.Error())
@@ -318,7 +440,7 @@ func (this *SqliteDB) SaveCollectionChanges(ctx context.Context, new_collection 
 					}
 				}
 
-				new_fields_strings = append(new_fields_strings, new_field.FieldName)
+				changed_fields_strings = append(changed_fields_strings, new_field.FieldName)
 
 				if new_field.FieldType != old_field.FieldType {
 					needs_to_create_new = true
@@ -377,17 +499,17 @@ func (this *SqliteDB) SaveCollectionChanges(ctx context.Context, new_collection 
 					needs_to_copy = true
 
 					if_succeds = append(if_succeds, func() {
-                            err := this.objects_queries.ChangeFieldOptions(ctx, objects.ChangeFieldOptionsParams{
-                                FieldOptions: sql.NullString(new_field.FieldOptions),
-                                ID:           old_field.ID,
-                            })
-
-                            if err != nil {
-                                err = errors.New("Cant change field options: " + err.Error())
-                                logger.Error(err.Error())
-                                return
-                            }
+						err := this.objects_queries.ChangeFieldOptions(ctx, objects.ChangeFieldOptionsParams{
+							FieldOptions: sql.NullString(new_field.FieldOptions),
+							ID:           old_field.ID,
 						})
+
+						if err != nil {
+							err = errors.New("Cant change field options: " + err.Error())
+							logger.Error(err.Error())
+							return
+						}
+					})
 				}
 				break
 			}
@@ -398,23 +520,23 @@ func (this *SqliteDB) SaveCollectionChanges(ctx context.Context, new_collection 
 			needs_to_create_new = true
 			needs_to_copy = true
 
-            is_new_field_fk, new_field_fk_refers_to := analyze_if_fk(new_field.FieldType)
+			is_new_field_fk, new_field_fk_refers_to := analyze_if_fk(new_field.FieldType)
 
 			if_succeds = append(if_succeds, func() {
-                params := objects.CreateFieldParams{
+				params := objects.CreateFieldParams{
 					FieldName:    new_field.FieldName,
 					FieldType:    new_field.FieldType,
 					FieldOptions: sql.NullString(new_field.FieldOptions),
 					CollectionID: new_collection.ID,
-                    IsForeignKey: is_new_field_fk,
+					IsForeignKey: is_new_field_fk,
 				}
-                if is_new_field_fk {
-                    params.FkRefersToTable = sql.NullString{
-                        String: new_field_fk_refers_to,
-                        Valid: true,
-                    }
+				if is_new_field_fk {
+					params.FkRefersToTable = sql.NullString{
+						String: new_field_fk_refers_to,
+						Valid:  true,
+					}
 
-                }
+				}
 				err := this.objects_queries.CreateField(ctx, params)
 
 				if err != nil {
@@ -436,9 +558,9 @@ func (this *SqliteDB) SaveCollectionChanges(ctx context.Context, new_collection 
 		}
 
 		if !fields_exists {
-            if old_field.IsLocked {
-                return errors.New("Cant delete locked field")
-            }
+			if old_field.IsLocked {
+				return errors.New("Cant delete locked field")
+			}
 			needs_to_create_new = true
 			needs_to_copy = true
 
@@ -455,63 +577,8 @@ func (this *SqliteDB) SaveCollectionChanges(ctx context.Context, new_collection 
 	}
 
 	if needs_to_create_new {
-		// changing table name
-		changed_collection_name := "old_" + new_collection.Name
-		err = this.changeCollectionTableName(ctx, new_collection.Name, changed_collection_name)
+		err = this.RecreateCollection(ctx, new_collection, needs_to_copy, changed_fields_strings)
 		if err != nil {
-			err = errors.New("Cant change table name: " + err.Error())
-			logger.Error(err.Error())
-			return err
-		}
-
-		// creating new table
-		create_query := getAddTableQueryForCollection(ctx, new_collection)
-		logger.Info("new table create query: " + create_query)
-		_, err = this.db.Exec(create_query)
-		if err != nil {
-			err = errors.New("Cant create new table: " + err.Error())
-			logger.Info("new table create query: " + create_query)
-			logger.Error(err.Error())
-			// reverting table name change
-			this.changeCollectionTableName(ctx, changed_collection_name, new_collection.Name)
-			// returning error
-			return err
-		}
-
-		// copying table
-		if needs_to_copy && len(old_collection.Fields) > 0 {
-			fields_string := strings.Join(new_fields_strings, ", ")
-			copy_query.WriteString(fields_string)
-			copy_query.WriteString(") ")
-			copy_query.WriteString("SELECT ")
-			copy_query.WriteString(fields_string)
-			copy_query.WriteString(" FROM ")
-			copy_query.WriteString(changed_collection_name)
-			copy_query.WriteString(";")
-
-			logger.Info("copy query: " + copy_query.String())
-
-			_, err = this.db.Exec(copy_query.String())
-			if err != nil {
-				err = errors.New("Cant copy collection: " + err.Error())
-				logger.Info("copy query: " + copy_query.String())
-				logger.Error(err.Error())
-				// droping new table
-				this.dropTable(ctx, new_collection.Name)
-				// reverting table name change
-				this.changeCollectionTableName(ctx, changed_collection_name, new_collection.Name)
-				// returning error
-				return err
-			}
-
-			// changing Collection and table_fields
-		}
-
-		// droping old table
-		err = this.dropTable(ctx, changed_collection_name)
-		if err != nil {
-			err = errors.New("Cant drop old table: " + err.Error())
-			logger.Error(err.Error())
 			return err
 		}
 
@@ -555,7 +622,7 @@ func (this *SqliteDB) ChangeCollectionName(ctx context.Context, old_name string,
 func (this *SqliteDB) ChangeFieldName(ctx context.Context, collection_name string, old_name string, new_name string, field_id int64) error {
 	logger := this.logger.With("collection_name", collection_name, "old_name", old_name, "new_name", new_name)
 	// removing table
-    err := this.objects_queries.ChangeFieldName(ctx, objects.ChangeFieldNameParams{
+	err := this.objects_queries.ChangeFieldName(ctx, objects.ChangeFieldNameParams{
 		FieldName: new_name,
 		ID:        field_id,
 	})

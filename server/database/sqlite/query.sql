@@ -88,6 +88,19 @@ SELECT collections.id AS collection_id,
 FROM collections 
 LEFT JOIN table_fields ON collections.id = table_fields.collection_id;
 
+-- name: GetCollectionsWithForeignKeyTo :many
+SELECT 
+    collections.table_name 
+FROM 
+    collections 
+WHERE
+    EXISTS (SELECT 1 FROM table_fields
+        WHERE
+            table_fields.collection_id = collections.id AND
+            table_fields.is_foreign_key = TRUE AND
+            table_fields.fk_refers_to_table = ?
+    );
+
 -- name: CreateCollection :one
 INSERT INTO collections (table_name)
 VALUES (?) RETURNING *;

@@ -135,6 +135,7 @@ func handleCollectionSearch(logger *slog.Logger, db database.Database, ar *acces
             var err error
             msg, err := decode[SearchMessage](r)
 			if err != nil {
+                logger.Error("Got error while trying to decode SearchMessage: " + err.Error())
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
@@ -170,6 +171,7 @@ func handleCollectionSearch(logger *slog.Logger, db database.Database, ar *acces
                 }
 
                 if !exists {
+                    logger.Error("Field does not exist: " + field_name)
                     w.WriteHeader(http.StatusBadRequest)
                     return
                 }
@@ -192,6 +194,7 @@ func handleCollectionSearch(logger *slog.Logger, db database.Database, ar *acces
                 }
 
                 if !exists {
+                    logger.Error("Field does not exist: " + field_name)
                     w.WriteHeader(http.StatusBadRequest)
                     return
                 }
@@ -292,7 +295,11 @@ func handleCollectionSearch(logger *slog.Logger, db database.Database, ar *acces
                     w.WriteHeader(http.StatusOK)
                     w.Write(resJson)
                 }
-			}
+			} else {
+                logger.Warn("Access rules rejected")
+                http.Error(w, "Do not have access to collection " + collection.Name, http.StatusNotFound)
+                return
+            }
         },
     )
 }

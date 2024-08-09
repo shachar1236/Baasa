@@ -1,2 +1,2 @@
 Accept = true
-Filters = "'post' = 'post"
+Filters = "'post' = 'post'"

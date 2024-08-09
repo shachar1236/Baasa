@@ -28,6 +28,7 @@ import (
 // '.<' - at least one is greater
 // '.<=' - at least one is greater or equel
 // '.!=' - at least one is not equel
+// TODO: add ~. and .~
 
 const numbers = "0123456789."
 
