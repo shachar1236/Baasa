@@ -38,7 +38,7 @@ When the MVP will be complete.
 - Database
 - Client API.
 - Access Rules to the database.
-- User authentication.
+- SDK.
 ---
 # Project features
 ## Admin dashboard
@@ -68,7 +68,23 @@ When the MVP will be complete.
 10. Get query.
 11. Update query.
 12. Delete query.
-13. Query custom query.
-14. Search in database with custom filters. (Same as Client API #_)
-15. 
+13. Query custom query. (Same as Client API #3)
+14. Search in collection by custom filters. (Same as Client API #4)
+## Client API
+1. Register.
+2. Login.
+3. Query custom query. (Same as Database #13)
+4. Search in collection by custom filters.
+5. Expand search results to get other collections fields.
+6. Get one from collection by custom filters and expand.
+7. Create record for collection.
+8. Create records for collection childrens when creating record for collection.
+9. Update collection record/s by custom filters.
+10. Update collections record childrens when updating collection records.
+11. Delete collection record by custom filters.
+## Access rules to database
+1. Create api for access rules script that containt the user properties, its connection details and more....
+2. Run access rules script when trying to access collection.
+3. Check access rules script result if can access collection and return it.
+4. Get the returned filters from the access rules script and apply it for the collection query.
 ---
