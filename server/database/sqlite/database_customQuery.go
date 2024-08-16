@@ -26,15 +26,13 @@ func (db *SqliteDB) BuildUserCustomQuery(
 	collection_name string,
 	fields []string,
 	filter_tokens []querylang_types.Token,
-	sort_by []string,
+    sort_by []string,
+    analyzed_SortBy []querylang_types.TokenValueVariable,
 	analyzed_expand []querylang_types.TokenValueVariable,
     limit int,
     offset int,
 	used_collections_filters map[string]string,
 ) (where_query string, err error) {
-
-	// sb_mutex.Lock()
-	// defer sb_mutex.Unlock()
     sb := sb_pool.Get().(strings.Builder)
     defer sb_pool.Put(sb)
 	defer sb.Reset()
@@ -112,6 +110,7 @@ func (db *SqliteDB) BuildUserCustomQuery(
 				sb.WriteString(token_as_variable.Parts[1])
 			} else {
 				// not valid
+                return "", errors.New("token variable len is lower then 2")
 			}
 		} else {
 			token_as_string := token.Value.(querylang_types.TokenValueString)
@@ -142,8 +141,8 @@ func (db *SqliteDB) BuildUserCustomQuery(
 	sql_query = sql_query.Where(where_query)
     
     // sort_by
-    if len(sort_by) > 0 {
-        addSortBy(sql_query, sort_by)
+    if len(analyzed_SortBy) > 0 {
+        addSortBy(sql_query, sort_by, analyzed_SortBy, used_collections_filters)
     }
 
     // limit
@@ -162,13 +161,14 @@ func (db *SqliteDB) RunUserCustomQuery(
 	collection_name string,
 	fields []string,
 	filter_tokens []querylang_types.Token,
-	sort_by []string,
+    sort_by []string,
+    analyzed_SortBy []querylang_types.TokenValueVariable,
 	analyzed_expand []querylang_types.TokenValueVariable,
     limit int,
     offset int,
 	used_collections_filters map[string]string, // map[collection_name]filters
 ) (resJson []byte, err error) {
-	query, err := db.BuildUserCustomQuery(collection_name, fields, filter_tokens, sort_by, analyzed_expand, limit, offset, used_collections_filters)
+	query, err := db.BuildUserCustomQuery(collection_name, fields, filter_tokens, sort_by, analyzed_SortBy, analyzed_expand, limit, offset, used_collections_filters)
 	if err != nil {
 		db.logger.Error("Error in user custom query: " + err.Error())
 		return
@@ -431,17 +431,14 @@ func joinExpandedFields(analyzed_expand []querylang_types.TokenValueVariable, bu
 	return
 }
 
-func addSortBy(builder *sqlf.Stmt, sort_by []string) {
+func addSortBy(builder *sqlf.Stmt, sort_by []string, analyzed_SortBy []querylang_types.TokenValueVariable, used_collections_filters map[string]string) {
     var my_sb strings.Builder
     for i := 0; i < len(sort_by); i++ {
         field := sort_by[i]
+        token := &analyzed_SortBy[i]
+        createExpandedSelect(token, &my_sb, used_collections_filters)
         if field[0] == '-' {
-            my_sb.WriteString(field[1:])
             my_sb.WriteString(" DESC")
-        } else if field[0] == '+' {
-            my_sb.WriteString(field[1:])
-        } else {
-            my_sb.WriteString(field)
         }
         if i != len(sort_by) - 1 {
             my_sb.WriteString(",")
