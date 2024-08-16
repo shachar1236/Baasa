@@ -138,7 +138,9 @@ func (db *SqliteDB) BuildUserCustomQuery(
 	sql_query.Expr(join_query)
 
 	// adding where
-	sql_query = sql_query.Where(where_query)
+    if where_query != "" {
+        sql_query = sql_query.Where(where_query)
+    }
     
     // sort_by
     if len(analyzed_SortBy) > 0 {
