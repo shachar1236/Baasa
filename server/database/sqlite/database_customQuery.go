@@ -191,11 +191,46 @@ func (db *SqliteDB) RunUserCustomQuery(
     var results []map[string]any
 
     for rows.Next() {
-        res := make(map[string]interface{})
-        err := rows.MapScan(res)
+        row_res := make(map[string]interface{})
+        err := rows.MapScan(row_res)
         if err != nil {
             db.logger.Error("Cannot run query: " + err.Error())
             return nil, err
+        }
+        // results = append(results, row_res)
+
+        res := make(map[string]interface{})
+        for _, field := range fields {
+            res[field] = row_res[field]
+        }
+
+        if len(analyzed_expand) > 0 {
+            expand := make(map[string]any)
+            for _, token := range analyzed_expand {
+                curr := expand
+                var sb strings.Builder
+                sb.WriteString(collection_name)
+                sb.WriteString("_")
+                for i := 1; i < len(token.Parts) - 1; i++ {
+                    part := token.Parts[i]
+                    m, exists := curr[part]
+                    if exists {
+                        curr = m.(map[string]interface{})
+                    } else {
+                        m := make(map[string]interface{})
+                        curr[part] = m
+                        curr = m
+                    }
+                    sb.WriteString(part)
+                    sb.WriteString("_")
+                }
+                last_part := token.Parts[len(token.Parts) - 1]
+                sb.WriteString(last_part)
+                fmt.Printf("%v\n", token.Parts)
+                db.logger.Info("expand: " + sb.String())
+                curr[last_part] = row_res[sb.String()]
+            }
+            res["expand"] = expand
         }
         results = append(results, res)
     }
