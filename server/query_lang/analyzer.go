@@ -48,28 +48,54 @@ func New(db database.Database) Analyzer {
 	logger := slog.New(slog.NewTextHandler(mw, &slog.HandlerOptions{AddSource: true}))
 
 	return Analyzer{
-        logger: logger,
-        db: db,
-    }
+		logger: logger,
+		db:     db,
+	}
 }
 
-func (this *Analyzer) AnalyzeVariableParts(my_collection_name string, token_as_variable *querylang_types.TokenValueVariable, analyze_type int) (valid bool, used_collections querylang_types.CollectionsSet) {
+func (this *Analyzer) AnalyzeVariableParts(my_collection_name string, token_as_variable *querylang_types.TokenValueVariable, analyze_options int) (valid bool, used_collections querylang_types.CollectionsSet) {
 	variable_parts := token_as_variable.Parts
 	used_collections.Init()
-
-    is_analyzing_filter := analyze_type == querylang_types.ANALYZE_VARIABLES_PARTS_ANALYZE_TYPE_FILTER
-    is_analyzing_join := analyze_type == querylang_types.ANALYZE_VARIABLES_PARTS_ANALYZE_TYPE_JOIN
-    backward_expand_occured := false
-
-	// its nested collections
-	my_collection, err := this.db.GetCollectionByName(context.Background(), variable_parts[0])
-	if err != nil {
-		valid = false
-		this.logger.Error("Cannot get collection: " + err.Error())
-		return
+	if analyze_options&querylang_types.ANALYZE_VARIABLES_PARTS_ANALYZE_OPTIONS_VALIDATE_VARIABLE != 0 {
+		if len(variable_parts) == 0 {
+			return false, used_collections
+		}
+		// for _, part := range variable_parts {
+		// TODO: validate variable if contains valid charecters without whitespace, for more info check https://trello.com/c/KYiiuBOM
+		// }
 	}
 
-	if my_collection.Name != my_collection_name {
+	var err error
+
+	// is_analyzing_filter := analyze_type == querylang_types.ANALYZE_VARIABLES_PARTS_ANALYZE_TYPE_FILTER
+	is_analyzing_join := analyze_options&querylang_types.ANALYZE_VARIABLES_PARTS_ANALYZE_OPTIONS_JOIN != 0
+	analize_options_not_list := analyze_options&querylang_types.ANALYZE_VARIABLES_PARTS_ANALYZE_OPTIONS_NOT_LIST != 0
+	analize_options_dont_fix := analyze_options&querylang_types.ANALYZE_VARIABLES_PARTS_ANALYZE_OPTIONS_DONT_FIX != 0
+	backward_expand_occured := false
+
+	var my_collection types.Collection
+	if variable_parts[0] == my_collection_name {
+		my_collection, err = this.db.GetCollectionByName(context.Background(), variable_parts[0])
+		if err != nil {
+			valid = false
+			this.logger.Error("Cannot get collection: " + err.Error())
+			return
+		}
+	} else if !analize_options_dont_fix {
+		my_collection, err = this.db.GetCollectionByName(context.Background(), my_collection_name)
+		if err != nil {
+			valid = false
+			this.logger.Error("Cannot get collection: " + err.Error())
+			return
+		}
+		parts := make([]string, len(variable_parts)+1)
+		parts[0] = my_collection_name
+		for i := 0; i < len(variable_parts); i++ {
+			parts[1+i] = variable_parts[i]
+		}
+		variable_parts = parts
+		token_as_variable.Parts = parts
+	} else {
 		valid = false
 		return
 	}
@@ -90,26 +116,26 @@ func (this *Analyzer) AnalyzeVariableParts(my_collection_name string, token_as_v
 
 		if my_field.ID != -1 {
 
-            token_as_variable.Fields[i-1].PartType = querylang_types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_FIELD_TYPE
-            token_as_variable.Fields[i-1].Field = querylang_types.TokenValueVariablePartField{
-                FieldName: my_field.FieldName,
-                FieldCollection: last_collection.Name,
-            }
+			token_as_variable.Fields[i-1].PartType = querylang_types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_FIELD_TYPE
+			token_as_variable.Fields[i-1].Field = querylang_types.TokenValueVariablePartField{
+				FieldName:       my_field.FieldName,
+				FieldCollection: last_collection.Name,
+			}
 
 			if my_field.IsForeignKey {
 				curr_collection_name := my_field.FkRefersToTable.String
-                curr_collection, exists := used_collections.GetCollectionByName(curr_collection_name)
-                if !exists {
-                    curr_collection, err = this.db.GetCollectionByName(context.Background(), curr_collection_name)
-                    if err != nil {
-                        valid = false
-                        this.logger.Error("Cannot get collection: " + err.Error())
-                        return
-                    }
-                }
+				curr_collection, exists := used_collections.GetCollectionByName(curr_collection_name)
+				if !exists {
+					curr_collection, err = this.db.GetCollectionByName(context.Background(), curr_collection_name)
+					if err != nil {
+						valid = false
+						this.logger.Error("Cannot get collection: " + err.Error())
+						return
+					}
+				}
 
-                token_as_variable.Fields[i-1].Field.FkRefersToCollection = curr_collection_name
-                token_as_variable.Fields[i-1].Field.FieldCollectionPointer = &curr_collection
+				token_as_variable.Fields[i-1].Field.FkRefersToCollection = curr_collection_name
+				token_as_variable.Fields[i-1].Field.FieldCollectionPointer = &curr_collection
 
 				last_collection = curr_collection
 				used_collections.Add(curr_collection)
@@ -117,18 +143,18 @@ func (this *Analyzer) AnalyzeVariableParts(my_collection_name string, token_as_v
 				valid = false
 				return
 			}
-		} else {
+		} else if !analize_options_not_list {
 			// maybe its a list
-			if i == len(variable_parts)-2 || (is_analyzing_join && !backward_expand_occured) {
-                curr_collection, exists := used_collections.GetCollectionByName(variable_parts[i])
-                if !exists {
-                    curr_collection, err = this.db.GetCollectionByName(context.Background(), variable_parts[i])
-                    if err != nil {
-                        valid = false
-                        this.logger.Error("Cannot get collection: " + err.Error())
-                        return
-                    }
-                }
+			if i == len(variable_parts)-2 && !backward_expand_occured {
+				curr_collection, exists := used_collections.GetCollectionByName(variable_parts[i])
+				if !exists {
+					curr_collection, err = this.db.GetCollectionByName(context.Background(), variable_parts[i])
+					if err != nil {
+						valid = false
+						this.logger.Error("Cannot get collection: " + err.Error())
+						return
+					}
+				}
 
 				// checking if collection has relation to last collection
 				has_relation := false
@@ -146,15 +172,18 @@ func (this *Analyzer) AnalyzeVariableParts(my_collection_name string, token_as_v
 					return
 				}
 
-                token_as_variable.Fields[i-1].PartType = querylang_types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_TYPE
-                token_as_variable.Fields[i-1].Collection = struct{CollectionName string;FkToLastPartField types.TableField}{
-                    CollectionName: curr_collection.Name,
-                    FkToLastPartField: relation,
-                }
-
+				token_as_variable.Fields[i-1].PartType = querylang_types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_TYPE
+				token_as_variable.Fields[i-1].Collection = struct {
+					CollectionName    string
+					FkToLastPartField types.TableField
+				}{
+					CollectionName:    curr_collection.Name,
+					FkToLastPartField: relation,
+				}
 
 				last_collection = curr_collection
 				used_collections.Add(curr_collection)
+				backward_expand_occured = true
 			} else {
 				// its not a list
 				valid = false
@@ -163,25 +192,23 @@ func (this *Analyzer) AnalyzeVariableParts(my_collection_name string, token_as_v
 		}
 	}
 
-	if !DoesCollectionHasField(last_collection, variable_parts[len(variable_parts)-1]) {
-        if is_analyzing_filter {
-            valid = false
-            return
-        } 
-        if is_analyzing_join && variable_parts[len(variable_parts)-1] != "*" {
-            valid = false
-            return
-        }
+	if variable_parts[len(variable_parts)-1] == "*" {
+		if !is_analyzing_join {
+			valid = false
+			return
+		}
+	} else if !DoesCollectionHasField(last_collection, variable_parts[len(variable_parts)-1]) {
+		valid = false
+		return
 	}
 
-    last_index := len(token_as_variable.Fields) - 1
-    token_as_variable.Fields[last_index].PartType = querylang_types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_FIELD_TYPE
-    token_as_variable.Fields[last_index].Field = querylang_types.TokenValueVariablePartField{
-        FieldName: variable_parts[len(variable_parts) - 1],
-        FieldCollection: last_collection.Name,
-    }
-    token_as_variable.Fields[last_index].Field.FieldCollectionPointer = &last_collection
-
+	last_index := len(token_as_variable.Fields) - 1
+	token_as_variable.Fields[last_index].PartType = querylang_types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_FIELD_TYPE
+	token_as_variable.Fields[last_index].Field = querylang_types.TokenValueVariablePartField{
+		FieldName:       variable_parts[len(variable_parts)-1],
+		FieldCollection: last_collection.Name,
+	}
+	token_as_variable.Fields[last_index].Field.FieldCollectionPointer = &last_collection
 
 	valid = true
 	return
@@ -243,37 +270,14 @@ func (this *Analyzer) AnalyzeUserFilter(my_collection_name string, filter string
 		if curr_token.Type == querylang_types.TOKEN_VARIABLE_TYPE {
 			// its a variable
 			token_as_variable := curr_token.Value.(querylang_types.TokenValueVariable)
-			if len(token_as_variable.Parts) > 2 {
-				my_valid, added_used_collections := this.AnalyzeVariableParts(my_collection_name, &token_as_variable, querylang_types.ANALYZE_VARIABLES_PARTS_ANALYZE_TYPE_FILTER)
-				if !my_valid {
-					valid = false
-					return
-				}
-				curr_token.Value = token_as_variable
-				used_collections.Union(added_used_collections)
-			} else if len(token_as_variable.Parts) == 2 {
-				// its a field from the collection
-				if token_as_variable.Parts[0] == my_collection_name {
-					// its nested collections
-					my_collection, err := this.db.GetCollectionByName(context.Background(), token_as_variable.Parts[0])
-					if err != nil {
-						valid = false
-						this.logger.Error("Cannot get collection: " + err.Error())
-						return
-					}
-
-					if !DoesCollectionHasField(my_collection, token_as_variable.Parts[1]) {
-						valid = false
-						return
-					}
-				} else {
-					valid = false
-					return
-				}
-			} else {
+			my_valid, added_used_collections := this.AnalyzeVariableParts(my_collection_name, &token_as_variable, querylang_types.ANALYZE_VARIABLES_PARTS_ANALYZE_OPTIONS_FILTER)
+			if !my_valid {
+				this.logger.Warn("Invalid token variable")
 				valid = false
 				return
 			}
+			curr_token.Value = token_as_variable
+			used_collections.Union(added_used_collections)
 		}
 
 		if curr_token.Type != querylang_types.TOKEN_OPEN_PARENTHESIS && curr_token.Type != querylang_types.TOKEN_CLOSE_PARENTHESIS {
@@ -285,4 +289,3 @@ func (this *Analyzer) AnalyzeUserFilter(my_collection_name string, filter string
 
 	return
 }
-

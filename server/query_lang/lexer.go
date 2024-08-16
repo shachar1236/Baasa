@@ -97,6 +97,8 @@ func (this *lexer) Next() querylang_types.Token {
 		}
 	}
 
+    // TODO: check if is string it only contains valid variable charachters, check https://trello.com/c/KYiiuBOM
+
 	return querylang_types.Token{
 		Value: querylang_types.TokenValueVariable{
 			Parts: strings.Split(my_token, "."),
