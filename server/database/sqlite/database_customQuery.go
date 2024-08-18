@@ -34,8 +34,8 @@ func (db *SqliteDB) BuildUserCustomQuery(
 	used_collections_filters map[string]string,
 ) (where_query string, err error) {
     sb := sb_pool.Get().(strings.Builder)
-    defer sb_pool.Put(sb)
 	defer sb.Reset()
+    defer sb_pool.Put(sb)
 
 	for _, token := range filter_tokens {
 		if token.Type == querylang_types.TOKEN_OPERATOR {
@@ -208,7 +208,10 @@ func (db *SqliteDB) RunUserCustomQuery(
             expand := make(map[string]any)
             for _, token := range analyzed_expand {
                 curr := expand
-                var sb strings.Builder
+                sb := sb_pool.Get().(strings.Builder)
+                defer sb.Reset()
+                defer sb_pool.Put(sb)
+
                 sb.WriteString(collection_name)
                 sb.WriteString("_")
                 for i := 1; i < len(token.Parts) - 1; i++ {
@@ -225,10 +228,21 @@ func (db *SqliteDB) RunUserCustomQuery(
                     sb.WriteString("_")
                 }
                 last_part := token.Parts[len(token.Parts) - 1]
-                sb.WriteString(last_part)
-                fmt.Printf("%v\n", token.Parts)
-                db.logger.Info("expand: " + sb.String())
-                curr[last_part] = row_res[sb.String()]
+                if last_part != "*" {
+                    sb.WriteString(last_part)
+                    curr[last_part] = row_res[sb.String()]
+                } else {
+                    last_field := token.Fields[len(token.Fields) - 1]
+                    collection := last_field.Field.FieldCollectionPointer
+                    if collection == nil {
+                        return nil, errors.New("Field Dosent have collection")
+                    }
+                    as_value_start := sb.String()
+                    for _, field := range collection.Fields {
+                        field_name := as_value_start + field.FieldName
+                        curr[field.FieldName] = row_res[field_name]
+                    }
+                }
             }
             res["expand"] = expand
         }
@@ -381,7 +395,9 @@ func joinExpandedFields(analyzed_expand []querylang_types.TokenValueVariable, bu
 		new_table_name := strings.ReplaceAll(k, ".", "_")
 
 		last_part := exp.Fields[len(exp.Fields)-1]
-		var join_on_sb strings.Builder
+        join_on_sb := sb_pool.Get().(strings.Builder)
+        defer join_on_sb.Reset()
+        defer sb_pool.Put(join_on_sb)
 		var select_token querylang_types.TokenValueVariable
 		if len(exp.Fields) >= 2 {
 			first_part := exp.Fields[0]
