@@ -192,7 +192,9 @@ func (this *Analyzer) AnalyzeVariableParts(my_collection_name string, token_as_v
 		}
 	}
 
-	if variable_parts[len(variable_parts)-1] == "*" {
+    field_name := variable_parts[len(variable_parts)-1]
+
+	if field_name == "*" {
 		if !is_analyzing_join {
 			valid = false
 			return
@@ -205,12 +207,29 @@ func (this *Analyzer) AnalyzeVariableParts(my_collection_name string, token_as_v
 	last_index := len(token_as_variable.Fields) - 1
 	token_as_variable.Fields[last_index].PartType = querylang_types.TOKEN_VALUE_VARIABLE_PART_COLLECTION_FIELD_TYPE
 	token_as_variable.Fields[last_index].Field = querylang_types.TokenValueVariablePartField{
-		FieldName:       variable_parts[len(variable_parts)-1],
+		FieldName:       field_name,
 		FieldCollection: last_collection.Name,
 	}
 	token_as_variable.Fields[last_index].Field.FieldCollectionPointer = &last_collection
 
 	valid = true
+
+    if is_analyzing_join {
+        if len(token_as_variable.Fields) > 1 {
+            last_field := token_as_variable.Fields[len(token_as_variable.Fields) - 2]
+            for _, field := range last_field.Field.FieldCollectionPointer.Fields {
+                if field.FieldName == last_field.Field.FieldName {
+                    if !field.IsForeignKey {
+                        valid = false
+                    }
+                    break
+                }
+            }
+        } else {
+            valid = false
+        }
+    }
+
 	return
 }
 
